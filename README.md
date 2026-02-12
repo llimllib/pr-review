@@ -34,14 +34,17 @@ bun build --compile --outfile=pr-review build/cli.js
 
 ## Setup
 
-Requires an API key for at least one supported provider. Configure via environment variable or pi's auth system:
+Configure an API key for at least one supported provider:
 
 ```bash
-# Option 1: Environment variable
-export ANTHROPIC_API_KEY=your-key-here
-# or OPENAI_API_KEY, etc.
+# Set an environment variable (one of these)
+export ANTHROPIC_API_KEY=...
+export OPENAI_API_KEY=...
+export GEMINI_API_KEY=...
+export OPENROUTER_API_KEY=...
+# ... or any other provider supported by pi
 
-# Option 2: Use pi's auth (if you have pi installed)
+# Or use pi's interactive auth
 pi auth
 ```
 
