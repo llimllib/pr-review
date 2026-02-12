@@ -1,4 +1,4 @@
-.PHONY: lint lint-fix clean
+.PHONY: lint lint-fix clean release
 
 SOURCES := $(wildcard src/*.ts)
 
@@ -16,3 +16,6 @@ lint-fix:
 
 clean:
 	rm -rf build pr-review dist
+
+release:
+	./tools/release.sh
