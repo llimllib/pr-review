@@ -15,6 +15,7 @@ Options:
   --context TEXT      Additional context for the review
   --context -         Read additional context from stdin
   -m, --model ID      Model to use (default: claude-sonnet-4-20250514)
+  -q, --quiet         Suppress progress output (spinners, status messages)
   -v, --verbose       Show each sub-agent's output before the summary
   -h, --help          Show this help message
 
@@ -37,6 +38,7 @@ const gitArgs: string[] = [];
 let agentNames = ALL_AGENT_NAMES;
 let modelId: string | undefined;
 let verbose = false;
+let quiet = false;
 let additionalContext = "";
 let contextValue = 10;
 let hasUnifiedContext = false;
@@ -54,6 +56,11 @@ while (i < args.length) {
 		case "-v":
 		case "--verbose":
 			verbose = true;
+			i++;
+			break;
+		case "-q":
+		case "--quiet":
+			quiet = true;
 			i++;
 			break;
 		case "-a":
@@ -145,10 +152,12 @@ const cwd = process.cwd();
 
 // Handle continue mode
 if (continueMessage) {
-	continueReview({ message: continueMessage, cwd, modelId }).catch((err) => {
-		console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
-		process.exit(1);
-	});
+	continueReview({ message: continueMessage, cwd, modelId, quiet }).catch(
+		(err) => {
+			console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
+			process.exit(1);
+		},
+	);
 } else {
 	// Add default unified context if not specified
 	if (!hasUnifiedContext) {
@@ -188,6 +197,7 @@ if (continueMessage) {
 		agentNames,
 		modelId,
 		verbose,
+		quiet,
 		additionalContext,
 	}).catch((err) => {
 		console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);

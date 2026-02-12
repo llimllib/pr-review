@@ -15,6 +15,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { AgentDefinition } from "./agents.ts";
 import { AGENTS, SUMMARIZER_PROMPT } from "./agents.ts";
+import { createSpinner, type Spinner } from "./spinner.ts";
 
 // Session file for continuing conversations
 const SESSION_DIR = path.join(os.homedir(), ".cache", "pr-review");
@@ -26,6 +27,7 @@ export interface ReviewOptions {
 	agentNames: string[];
 	modelId?: string;
 	verbose: boolean;
+	quiet: boolean;
 	additionalContext: string;
 }
 
@@ -33,6 +35,7 @@ export interface ContinueOptions {
 	message: string;
 	cwd: string;
 	modelId?: string;
+	quiet?: boolean;
 }
 
 function makeResourceLoader(systemPrompt: string): ResourceLoader {
@@ -95,6 +98,7 @@ async function runSubAgent(
 	modelRegistry: ModelRegistry,
 	additionalContext: string,
 	verbose: boolean,
+	spinner?: Spinner,
 ): Promise<string> {
 	const { session } = await createAgentSession({
 		cwd,
@@ -132,6 +136,7 @@ async function runSubAgent(
 	await session.prompt(prompt);
 	session.dispose();
 
+	spinner?.succeed(agent.name);
 	return result;
 }
 
@@ -142,6 +147,7 @@ async function runSummarizer(
 	model: Model<Api>,
 	authStorage: AuthStorage,
 	modelRegistry: ModelRegistry,
+	spinner?: Spinner,
 ): Promise<void> {
 	// Ensure session directory exists
 	fs.mkdirSync(SESSION_DIR, { recursive: true });
@@ -166,11 +172,16 @@ async function runSummarizer(
 		}),
 	});
 
+	let firstChunk = true;
 	session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
 			event.assistantMessageEvent.type === "text_delta"
 		) {
+			if (firstChunk) {
+				spinner?.stop();
+				firstChunk = false;
+			}
 			process.stdout.write(event.assistantMessageEvent.delta);
 		}
 	});
@@ -191,7 +202,7 @@ async function runSummarizer(
 }
 
 export async function continueReview(options: ContinueOptions): Promise<void> {
-	const { message, cwd, modelId } = options;
+	const { message, cwd, modelId, quiet = false } = options;
 
 	// Check if we have a previous session
 	if (!fs.existsSync(SESSION_FILE)) {
@@ -199,6 +210,8 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 			"No previous review session found. Run a review first with: pr-review <git-diff-args>",
 		);
 	}
+
+	const spinner = createSpinner("Loading previous session...", quiet);
 
 	const authStorage = new AuthStorage();
 	const modelRegistry = new ModelRegistry(authStorage);
@@ -222,6 +235,8 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 		}),
 	});
 
+	spinner.succeed("Session loaded");
+
 	session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
@@ -237,8 +252,10 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 }
 
 export async function runReview(options: ReviewOptions): Promise<void> {
-	const { diff, cwd, agentNames, modelId, verbose, additionalContext } =
+	const { diff, cwd, agentNames, modelId, verbose, quiet, additionalContext } =
 		options;
+
+	const spinner = createSpinner("Initializing...", quiet || verbose);
 
 	const authStorage = new AuthStorage();
 	const modelRegistry = new ModelRegistry(authStorage);
@@ -252,6 +269,22 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 			`\x1b[34m• Running agents: ${agentNames.join(", ")}\x1b[0m\n\n`,
 		);
 	}
+
+	// Track completed agents for spinner updates
+	const completed: string[] = [];
+	const total = agentNames.length;
+
+	const updateSpinner = () => {
+		const remaining = agentNames.filter((n) => !completed.includes(n));
+		if (remaining.length > 0) {
+			const agent = AGENTS[remaining[0]];
+			spinner.update(
+				`Running ${agent?.name ?? remaining[0]}... (${completed.length}/${total})`,
+			);
+		}
+	};
+
+	spinner.update(`Running agents... (0/${total})`);
 
 	// Run sub-agents in parallel
 	const agentPromises = agentNames.map(async (name) => {
@@ -277,17 +310,35 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 			process.stderr.write(`\n\x1b[33m━━━ end ${agent.name} ━━━\x1b[0m\n\n`);
 		}
 
+		completed.push(name);
+		updateSpinner();
+
 		return [agent.name, report] as const;
 	});
 
 	const results = await Promise.all(agentPromises);
 	const reports = new Map(results);
 
+	spinner.succeed(`Agents complete (${total}/${total})`);
+
 	if (verbose) {
 		process.stderr.write(`\x1b[34m• Running summarizer...\x1b[0m\n\n`);
 	}
 
+	const summarizerSpinner = createSpinner(
+		"Generating summary...",
+		quiet || verbose,
+	);
+
 	// Run summarizer
-	await runSummarizer(diff, reports, cwd, model, authStorage, modelRegistry);
+	await runSummarizer(
+		diff,
+		reports,
+		cwd,
+		model,
+		authStorage,
+		modelRegistry,
+		summarizerSpinner,
+	);
 	process.stdout.write("\n");
 }
