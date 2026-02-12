@@ -1,6 +1,6 @@
 # pr-review
 
-A CLI tool that uses multiple specialized AI agents to review code changes. Each agent focuses on a different aspect of the review, then a summarizer synthesizes their findings into a single coherent report.
+A CLI tool based on [pi](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) that uses multiple specialized AI agents to review code changes. Each agent focuses on a different aspect of the review, then a summarizer synthesizes their findings into a single coherent report.
 
 ## Installation
 
@@ -9,6 +9,25 @@ A CLI tool that uses multiple specialized AI agents to review code changes. Each
 ```bash
 brew install llimllib/tap/pr-review
 ```
+
+You can download a binary from [relases](https://github.com/llimllib/pr-review/releases) if you don't want to use homebrew
+
+## The agents
+
+The four sub-agents are:
+
+- [Bug Hunter](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L13)
+    - Finds logic bugs, edge cases, and incorrect assumptions
+- [Test Reviewer](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L38)
+    - Checks test coverage and quality
+- [Impact Analyzer](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L63)
+    - Traces cross-file dependencies and breaking changes
+- [Code Quality](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L91)
+    - Reviews style, conventions, error handling, and maintainability
+
+Once the agents have reported their results, they're synthesized by the [summarizer](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L121)
+
+This setup is heavily inspired by [anthropic's pr-review-toolkit](https://github.com/anthropics/claude-code/tree/main/plugins/pr-review-toolkit)
 
 ### Download Binary
 
