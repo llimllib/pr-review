@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { getModel } from "@mariozechner/pi-ai";
 import type { ResourceLoader } from "@mariozechner/pi-coding-agent";
@@ -13,6 +16,10 @@ import {
 import type { AgentDefinition } from "./agents.ts";
 import { AGENTS, SUMMARIZER_PROMPT } from "./agents.ts";
 
+// Session file for continuing conversations
+const SESSION_DIR = path.join(os.homedir(), ".cache", "pr-review");
+const SESSION_FILE = path.join(SESSION_DIR, "last-session.jsonl");
+
 export interface ReviewOptions {
 	diff: string;
 	cwd: string;
@@ -20,6 +27,12 @@ export interface ReviewOptions {
 	modelId?: string;
 	verbose: boolean;
 	additionalContext: string;
+}
+
+export interface ContinueOptions {
+	message: string;
+	cwd: string;
+	modelId?: string;
 }
 
 function makeResourceLoader(systemPrompt: string): ResourceLoader {
@@ -130,6 +143,14 @@ async function runSummarizer(
 	authStorage: AuthStorage,
 	modelRegistry: ModelRegistry,
 ): Promise<void> {
+	// Ensure session directory exists
+	fs.mkdirSync(SESSION_DIR, { recursive: true });
+
+	// Create a persistent session for the summarizer
+	const sessionManager = SessionManager.create(cwd, SESSION_DIR);
+	// Rename the session file to our known location for easy continuation
+	const originalFile = sessionManager.getSessionFile();
+
 	const { session } = await createAgentSession({
 		cwd,
 		model,
@@ -138,7 +159,7 @@ async function runSummarizer(
 		modelRegistry,
 		resourceLoader: makeResourceLoader(SUMMARIZER_PROMPT),
 		tools: [],
-		sessionManager: SessionManager.inMemory(),
+		sessionManager,
 		settingsManager: SettingsManager.inMemory({
 			compaction: { enabled: false },
 			retry: { enabled: true, maxRetries: 2 },
@@ -162,6 +183,57 @@ async function runSummarizer(
 
 	await session.prompt(prompt);
 	session.dispose();
+
+	// Copy the session file to our known location
+	if (originalFile && fs.existsSync(originalFile)) {
+		fs.copyFileSync(originalFile, SESSION_FILE);
+	}
+}
+
+export async function continueReview(options: ContinueOptions): Promise<void> {
+	const { message, cwd, modelId } = options;
+
+	// Check if we have a previous session
+	if (!fs.existsSync(SESSION_FILE)) {
+		throw new Error(
+			"No previous review session found. Run a review first with: pr-review <git-diff-args>",
+		);
+	}
+
+	const authStorage = new AuthStorage();
+	const modelRegistry = new ModelRegistry(authStorage);
+	const model = await resolveModel(authStorage, modelRegistry, modelId);
+
+	// Open the existing session
+	const sessionManager = SessionManager.open(SESSION_FILE, SESSION_DIR);
+
+	const { session } = await createAgentSession({
+		cwd,
+		model,
+		thinkingLevel: "off",
+		authStorage,
+		modelRegistry,
+		resourceLoader: makeResourceLoader(SUMMARIZER_PROMPT),
+		tools: [],
+		sessionManager,
+		settingsManager: SettingsManager.inMemory({
+			compaction: { enabled: false },
+			retry: { enabled: true, maxRetries: 2 },
+		}),
+	});
+
+	session.subscribe((event) => {
+		if (
+			event.type === "message_update" &&
+			event.assistantMessageEvent.type === "text_delta"
+		) {
+			process.stdout.write(event.assistantMessageEvent.delta);
+		}
+	});
+
+	await session.prompt(message);
+	session.dispose();
+	process.stdout.write("\n");
 }
 
 export async function runReview(options: ReviewOptions): Promise<void> {
