@@ -153,6 +153,21 @@ This will:
 2. Create a GitHub release with the binaries
 3. Update the Homebrew tap formula
 
+## Inspiration
+
+This repository comes from two sources:
+
+- [This skeet from @sunshowers.io](https://bsky.app/profile/did:plc:sl3g3nhnad34sfhjnqdivbzd/post/3membtopelk24)
+
+> my current review prompt:
+
+> ! jj show @- --git
+> review this PR systematically and in depth. for the code itself, use the pr-review-toolkit. But also independently think about higher-level architectural concerns and the negative space -- what do we need to update that we missed?
+
+> (using [this plugin](https://github.com/anthropics/claude-code/tree/main/plugins/pr-review-toolkit))
+
+- My [review tool](https://github.com/llimllib/personal_code/blob/master/homedir/.local/bin/review), which I [wrote about here](https://notes.billmill.org/blog/2025/07/An_AI_tool_I_find_useful.html)
+
 ## License
 
 MIT
