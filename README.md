@@ -34,7 +34,7 @@ bun build --compile --outfile=pr-review build/cli.js
 
 ## Setup
 
-Configure an API key for at least one supported provider:
+Configure [pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent#quick-start) if you haven't done so yet
 
 ```bash
 # Set an environment variable (one of these)
@@ -45,7 +45,7 @@ export OPENROUTER_API_KEY=...
 # ... or any other provider supported by pi
 
 # Or use pi's interactive auth
-pi auth
+npm install -g @mariozechner/pi-coding-agent && pi "/login"
 ```
 
 The default model is `claude-sonnet-4-20250514`. Use `-m` to specify a different model.
