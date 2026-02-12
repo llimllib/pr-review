@@ -10,6 +10,7 @@
     "@mariozechner/pi-coding-agent": "*"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.15"
+    "@biomejs/biome": "^2.3.15",
+    "esbuild": "^0.27.3"
   }
 }
