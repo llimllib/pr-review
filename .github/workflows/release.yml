@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            artifact: pr-review-linux-amd64
+          - os: ubuntu-latest
+            target: bun-linux-arm64
+            artifact: pr-review-linux-arm64
+          - os: macos-latest
+            target: bun-darwin-x64
+            artifact: pr-review-darwin-amd64
+          - os: macos-latest
+            target: bun-darwin-arm64
+            artifact: pr-review-darwin-arm64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build bundle
+        run: bun run build.ts
+
+      - name: Build binary
+        run: |
+          bun build --compile --target=${{ matrix.target }} --outfile=${{ matrix.artifact }} dist/cli.js
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Prepare release assets
+        run: |
+          cd dist
+          for dir in */; do
+            name="${dir%/}"
+            mv "$dir/$name" "./$name"
+            chmod +x "./$name"
+            tar -czvf "${name}.tar.gz" "$name" ../README.md ../LICENSE
+            rm "$name"
+            rmdir "$dir"
+          done
+          sha256sum *.tar.gz > checksums.txt
+          ls -la
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/checksums.txt
+          generate_release_notes: true
+
+  homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tap
+        uses: actions/checkout@v4
+        with:
+          repository: llimllib/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          
+          # Get checksums
+          curl -sL "https://github.com/llimllib/pr-review/releases/download/v${VERSION}/checksums.txt" -o checksums.txt
+          
+          AMD64_SHA=$(grep "darwin-amd64" checksums.txt | cut -d' ' -f1)
+          ARM64_SHA=$(grep "darwin-arm64" checksums.txt | cut -d' ' -f1)
+          LINUX_AMD64_SHA=$(grep "linux-amd64" checksums.txt | cut -d' ' -f1)
+          LINUX_ARM64_SHA=$(grep "linux-arm64" checksums.txt | cut -d' ' -f1)
+          
+          cat > homebrew-tap/Formula/pr-review.rb << EOF
+          class PrReview < Formula
+            desc "AI-powered code review using multiple specialized agents"
+            homepage "https://github.com/llimllib/pr-review"
+            version "${VERSION}"
+            license "MIT"
+          
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/llimllib/pr-review/releases/download/v${VERSION}/pr-review-darwin-arm64.tar.gz"
+                sha256 "${ARM64_SHA}"
+              else
+                url "https://github.com/llimllib/pr-review/releases/download/v${VERSION}/pr-review-darwin-amd64.tar.gz"
+                sha256 "${AMD64_SHA}"
+              end
+            end
+          
+            on_linux do
+              if Hardware::CPU.arm?
+                url "https://github.com/llimllib/pr-review/releases/download/v${VERSION}/pr-review-linux-arm64.tar.gz"
+                sha256 "${LINUX_ARM64_SHA}"
+              else
+                url "https://github.com/llimllib/pr-review/releases/download/v${VERSION}/pr-review-linux-amd64.tar.gz"
+                sha256 "${LINUX_AMD64_SHA}"
+              end
+            end
+          
+            def install
+              bin.install "pr-review"
+            end
+          
+            test do
+              system "#{bin}/pr-review", "--help"
+            end
+          end
+          EOF
+
+      - name: Commit and push
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/pr-review.rb
+          git commit -m "Update pr-review to ${GITHUB_REF#refs/tags/}"
+          git push

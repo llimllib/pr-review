@@ -4,17 +4,35 @@ A CLI tool that uses multiple specialized AI agents to review code changes. Each
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
 ```bash
-# Clone and build
+brew install llimllib/tap/pr-review
+```
+
+### Download Binary
+
+Download the latest release for your platform from the [releases page](https://github.com/llimllib/pr-review/releases).
+
+```bash
+# Example for macOS ARM64
+curl -L https://github.com/llimllib/pr-review/releases/latest/download/pr-review-darwin-arm64.tar.gz | tar xz
+mv pr-review ~/.local/bin/
+```
+
+### Build from Source
+
+Requires [Bun](https://bun.sh):
+
+```bash
 git clone https://github.com/llimllib/pr-review
 cd pr-review
 bun install
 bun run build.ts
 bun build --compile --outfile=pr-review dist/cli.js
-
-# Copy to your PATH
-cp pr-review ~/.local/bin/
 ```
+
+## Setup
 
 Requires an Anthropic API key:
 ```bash
@@ -95,6 +113,9 @@ git log -1 --pretty=%B | pr-review --context - main
 ## Development
 
 ```bash
+# Install dependencies
+bun install
+
 # Build
 bun run build.ts
 bun build --compile --outfile=pr-review dist/cli.js
@@ -106,6 +127,20 @@ make pr-review
 make lint
 make lint-fix
 ```
+
+## Releasing
+
+Releases are automated via GitHub Actions. To create a new release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+This will:
+1. Build binaries for Linux and macOS (amd64/arm64)
+2. Create a GitHub release with the binaries
+3. Update the Homebrew tap formula
 
 ## License
 
