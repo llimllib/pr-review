@@ -29,7 +29,7 @@ git clone https://github.com/llimllib/pr-review
 cd pr-review
 bun install
 bun run build.ts
-bun build --compile --outfile=pr-review dist/cli.js
+bun build --compile --outfile=pr-review build/cli.js
 ```
 
 ## Setup
@@ -118,7 +118,7 @@ bun install
 
 # Build
 bun run build.ts
-bun build --compile --outfile=pr-review dist/cli.js
+bun build --compile --outfile=pr-review build/cli.js
 
 # Or use make
 make pr-review

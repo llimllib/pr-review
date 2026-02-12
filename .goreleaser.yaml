@@ -1,0 +1,70 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# GoReleaser config for pr-review (Bun/TypeScript project)
+#
+# Run with: goreleaser release --clean
+# For local testing: goreleaser release --snapshot --clean
+
+version: 2
+
+project_name: pr-review
+
+before:
+  hooks:
+    - bun install
+    - bun run build.ts
+    - npx biome check src/
+
+builds:
+  - id: pr-review
+    builder: bun
+    binary: pr-review
+    main: build/cli.js
+    targets:
+      - linux-x64
+      - linux-arm64
+      - darwin-x64
+      - darwin-arm64
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  use: github
+
+release:
+  github:
+    owner: llimllib
+    name: pr-review
+  draft: false
+  prerelease: auto
+  name_template: "v{{ .Version }}"
+
+brews:
+  - name: pr-review
+    repository:
+      owner: llimllib
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://github.com/llimllib/pr-review"
+    description: "AI-powered code review using multiple specialized agents"
+    license: "MIT"
+    install: |
+      bin.install "pr-review"
+
+announce:
+  skip: "true"

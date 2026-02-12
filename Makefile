@@ -2,10 +2,10 @@
 
 SOURCES := $(wildcard src/*.ts)
 
-pr-review: dist/cli.js
-	bun build --compile --outfile=pr-review dist/cli.js
+pr-review: build/cli.js
+	bun build --compile --outfile=pr-review build/cli.js
 
-dist/cli.js: $(SOURCES) build.ts
+build/cli.js: $(SOURCES) build.ts
 	bun run build.ts
 
 lint:
@@ -15,4 +15,4 @@ lint-fix:
 	npx biome check --write src/
 
 clean:
-	rm -rf dist pr-review
+	rm -rf build pr-review dist

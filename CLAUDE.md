@@ -36,7 +36,7 @@ Two-stage build process:
 2. **Compile** (`Makefile`): Uses `bun build --compile` to create standalone binary
 
 ```bash
-bun run build.ts              # Creates dist/cli.js
+bun run build.ts              # Creates build/cli.js
 bun build --compile ...       # Creates ./pr-review binary
 ```
 

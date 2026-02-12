@@ -56,7 +56,7 @@ await esbuild.build({
 	platform: "node",
 	target: "node20",
 	format: "esm",
-	outfile: "dist/cli.js",
+	outfile: "build/cli.js",
 	plugins: [
 		{
 			name: "stub-config",
@@ -83,4 +83,4 @@ await esbuild.build({
 	],
 });
 
-console.log("Built dist/cli.js");
+console.log("Built build/cli.js");
