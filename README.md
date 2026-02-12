@@ -34,10 +34,18 @@ bun build --compile --outfile=pr-review build/cli.js
 
 ## Setup
 
-Requires an Anthropic API key:
+Requires an API key for at least one supported provider. Configure via environment variable or pi's auth system:
+
 ```bash
+# Option 1: Environment variable
 export ANTHROPIC_API_KEY=your-key-here
+# or OPENAI_API_KEY, etc.
+
+# Option 2: Use pi's auth (if you have pi installed)
+pi auth
 ```
+
+The default model is `claude-sonnet-4-20250514`. Use `-m` to specify a different model.
 
 ## Usage
 
