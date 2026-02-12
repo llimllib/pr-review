@@ -6,7 +6,10 @@
     "pr-review": "./bin/pr-review"
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "*",
-    "@mariozechner/pi-ai": "*"
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.15"
   }
 }

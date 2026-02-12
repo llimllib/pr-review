@@ -3,16 +3,16 @@
 // tools to explore the codebase for additional context.
 
 export interface AgentDefinition {
-  name: string;
-  description: string;
-  systemPrompt: string;
+	name: string;
+	description: string;
+	systemPrompt: string;
 }
 
 export const AGENTS: Record<string, AgentDefinition> = {
-  bug: {
-    name: "Bug Hunter",
-    description: "Finds logic bugs, edge cases, and incorrect assumptions",
-    systemPrompt: `You are an expert code reviewer focused on finding bugs and logic errors.
+	bug: {
+		name: "Bug Hunter",
+		description: "Finds logic bugs, edge cases, and incorrect assumptions",
+		systemPrompt: `You are an expert code reviewer focused on finding bugs and logic errors.
 
 You will receive a git diff. Your job is to find:
 - Logic bugs and incorrect assumptions
@@ -32,12 +32,12 @@ For each issue found, provide:
 If you find no issues, say so briefly. Don't invent problems.
 
 Be specific and actionable. Output your findings in markdown.`,
-  },
+	},
 
-  test: {
-    name: "Test Reviewer",
-    description: "Checks test coverage and quality",
-    systemPrompt: `You are an expert code reviewer focused on test coverage and quality.
+	test: {
+		name: "Test Reviewer",
+		description: "Checks test coverage and quality",
+		systemPrompt: `You are an expert code reviewer focused on test coverage and quality.
 
 You will receive a git diff. Your job is to:
 - Check if changed behavior is covered by existing tests
@@ -58,12 +58,12 @@ For each finding, provide:
 If test coverage looks good, say so briefly. Don't invent problems.
 
 Be specific and actionable. Output your findings in markdown.`,
-  },
+	},
 
-  impact: {
-    name: "Impact Analyzer",
-    description: "Traces cross-file dependencies and breaking changes",
-    systemPrompt: `You are an expert code reviewer focused on cross-file impact analysis.
+	impact: {
+		name: "Impact Analyzer",
+		description: "Traces cross-file dependencies and breaking changes",
+		systemPrompt: `You are an expert code reviewer focused on cross-file impact analysis.
 
 You will receive a git diff. Your job is to:
 - Trace how changes affect other parts of the codebase
@@ -86,12 +86,13 @@ For each finding, provide:
 If the changes are well-contained, say so briefly. Don't invent problems.
 
 Be specific and actionable. Output your findings in markdown.`,
-  },
+	},
 
-  quality: {
-    name: "Code Quality",
-    description: "Reviews style, conventions, error handling, and maintainability",
-    systemPrompt: `You are an expert code reviewer focused on code quality and conventions.
+	quality: {
+		name: "Code Quality",
+		description:
+			"Reviews style, conventions, error handling, and maintainability",
+		systemPrompt: `You are an expert code reviewer focused on code quality and conventions.
 
 You will receive a git diff. Your job is to:
 - Check consistency with the project's existing style and patterns
@@ -114,7 +115,7 @@ For each finding, provide:
 If code quality looks good, say so briefly. Don't invent problems.
 
 Be specific and actionable. Output your findings in markdown.`,
-  },
+	},
 };
 
 export const SUMMARIZER_PROMPT = `You are a senior engineer synthesizing multiple focused code reviews into a single coherent PR review.
@@ -133,3 +134,8 @@ Keep the review concise and actionable. Use markdown formatting.
 If the reviewers found no significant issues, say so — don't pad the review.`;
 
 export const ALL_AGENT_NAMES = Object.keys(AGENTS);
+
+// Helper to get agent by name, returns undefined if not found
+export function getAgent(name: string): AgentDefinition | undefined {
+	return AGENTS[name];
+}
