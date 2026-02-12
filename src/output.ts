@@ -1,4 +1,4 @@
-import { spawn, execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import type { Writable } from "node:stream";
 
 export type ColorMode = "auto" | "always" | "never";

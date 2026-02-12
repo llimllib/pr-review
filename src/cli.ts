@@ -184,12 +184,16 @@ const cwd = process.cwd();
 
 // Handle continue mode
 if (continueMessage) {
-	continueReview({ message: continueMessage, cwd, modelId, quiet, colorMode }).catch(
-		(err) => {
-			console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
-			process.exit(1);
-		},
-	);
+	continueReview({
+		message: continueMessage,
+		cwd,
+		modelId,
+		quiet,
+		colorMode,
+	}).catch((err) => {
+		console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
+		process.exit(1);
+	});
 } else {
 	// Add default unified context if not specified
 	if (!hasUnifiedContext) {
