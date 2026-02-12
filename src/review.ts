@@ -83,7 +83,9 @@ async function resolveModel(
 	const available = await modelRegistry.getAvailable();
 	if (available.length === 0) {
 		throw new Error(
-			"No models available. Set ANTHROPIC_API_KEY or configure pi auth.",
+			"No API key configured. Either:\n" +
+				"  • Set ANTHROPIC_API_KEY (or OPENAI_API_KEY, etc.) environment variable\n" +
+				"  • Run 'pi auth' to configure authentication interactively",
 		);
 	}
 	return available[0];
