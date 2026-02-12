@@ -128,7 +128,13 @@ Your job is to:
 3. Deduplicate — if multiple reviewers flagged the same issue, merge them
 4. Rank by severity: critical bugs > missing tests > breaking changes > style issues
 5. For each finding, keep the specific file locations and actionable suggestions
-6. End with a brief "strengths" section noting what was done well
+
+IMPORTANT — Go beyond the sub-agent reports. Independently consider:
+- **Architectural concerns**: Does this change fit well with the system's architecture? Are there design patterns being violated? Does it introduce technical debt or coupling that will cause problems later?
+- **The negative space**: What's *missing* from this PR that should be there? Are there related files that should have been updated but weren't? Missing migrations, config changes, documentation updates, or changelog entries? Features that are half-implemented?
+
+6. Add a section for architectural concerns and missing pieces (if any)
+7. End with a brief "strengths" section noting what was done well
 
 Keep the review concise and actionable. Use markdown formatting.
 If the reviewers found no significant issues, say so — don't pad the review.`;

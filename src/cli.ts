@@ -13,7 +13,7 @@ Options:
                       Available: ${ALL_AGENT_NAMES.join(", ")}
   -c, --context TEXT  Additional context for the review
       --context -     Read additional context from stdin
-  -m, --model ID     Model to use (default: claude-sonnet-4-20250514)
+  -m, --model ID      Model to use (default: claude-sonnet-4-20250514)
   -v, --verbose       Show each sub-agent's output before the summary
   -h, --help          Show this help message
 
@@ -154,7 +154,7 @@ if (!diff) {
 const estimatedTokens = Math.ceil(diff.length / 4);
 if (estimatedTokens > 50000) {
 	process.stderr.write(
-		`\x1b[33m⚠ Large diff (~${Math.round(estimatedTokens / 1000)}k tokens). Consider reviewing a smaller set of changes.\x1b[0m\n`,
+		`\x1b[33m! Large diff (~${Math.round(estimatedTokens / 1000)}k tokens). Consider reviewing a smaller set of changes.\x1b[0m\n`,
 	);
 }
 
