@@ -15,6 +15,8 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { AgentDefinition } from "./agents.ts";
 import { AGENTS, SUMMARIZER_PROMPT } from "./agents.ts";
+import type { ColorMode, OutputWriter } from "./output.ts";
+import { createOutputWriter } from "./output.ts";
 import { createSpinner, type Spinner } from "./spinner.ts";
 
 // Session file for continuing conversations
@@ -29,6 +31,7 @@ export interface ReviewOptions {
 	verbose: boolean;
 	quiet: boolean;
 	additionalContext: string;
+	colorMode: ColorMode;
 }
 
 export interface ContinueOptions {
@@ -36,6 +39,7 @@ export interface ContinueOptions {
 	cwd: string;
 	modelId?: string;
 	quiet?: boolean;
+	colorMode?: ColorMode;
 }
 
 function makeResourceLoader(systemPrompt: string): ResourceLoader {
@@ -149,6 +153,7 @@ async function runSummarizer(
 	model: Model<Api>,
 	authStorage: AuthStorage,
 	modelRegistry: ModelRegistry,
+	outputWriter: OutputWriter,
 	spinner?: Spinner,
 ): Promise<void> {
 	// Ensure session directory exists
@@ -184,7 +189,7 @@ async function runSummarizer(
 				spinner?.stop();
 				firstChunk = false;
 			}
-			process.stdout.write(event.assistantMessageEvent.delta);
+			outputWriter.write(event.assistantMessageEvent.delta);
 		}
 	});
 
@@ -204,7 +209,7 @@ async function runSummarizer(
 }
 
 export async function continueReview(options: ContinueOptions): Promise<void> {
-	const { message, cwd, modelId, quiet = false } = options;
+	const { message, cwd, modelId, quiet = false, colorMode = "auto" } = options;
 
 	// Check if we have a previous session
 	if (!fs.existsSync(SESSION_FILE)) {
@@ -239,23 +244,34 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 
 	spinner.succeed("Session loaded");
 
+	const outputWriter = createOutputWriter(colorMode);
+
 	session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
 			event.assistantMessageEvent.type === "text_delta"
 		) {
-			process.stdout.write(event.assistantMessageEvent.delta);
+			outputWriter.write(event.assistantMessageEvent.delta);
 		}
 	});
 
 	await session.prompt(message);
 	session.dispose();
+	await outputWriter.end();
 	process.stdout.write("\n");
 }
 
 export async function runReview(options: ReviewOptions): Promise<void> {
-	const { diff, cwd, agentNames, modelId, verbose, quiet, additionalContext } =
-		options;
+	const {
+		diff,
+		cwd,
+		agentNames,
+		modelId,
+		verbose,
+		quiet,
+		additionalContext,
+		colorMode,
+	} = options;
 
 	const spinner = createSpinner("Initializing...", quiet || verbose);
 
@@ -332,6 +348,8 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 		quiet || verbose,
 	);
 
+	const outputWriter = createOutputWriter(colorMode);
+
 	// Run summarizer
 	await runSummarizer(
 		diff,
@@ -340,7 +358,9 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 		model,
 		authStorage,
 		modelRegistry,
+		outputWriter,
 		summarizerSpinner,
 	);
+	await outputWriter.end();
 	process.stdout.write("\n");
 }

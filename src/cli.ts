@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { ALL_AGENT_NAMES } from "./agents.ts";
+import type { ColorMode } from "./output.ts";
 import { continueReview, runReview } from "./review.ts";
 
 function usage(exitCode: number = 0): never {
@@ -12,6 +13,8 @@ Options:
   -a, --agents NAMES  Comma-separated list of agents to run (default: all)
                       Available: ${ALL_AGENT_NAMES.join(", ")}
   -c, --continue MSG  Continue chatting about the last review
+  --color WHEN        When to colorize output: auto, always, never (default: auto)
+                      Uses mdriver or bat if available. Respects NO_COLOR env var.
   --context TEXT      Additional context for the review
   --context -         Read additional context from stdin
   -m, --model ID      Model to use (default: claude-sonnet-4-20250514)
@@ -43,6 +46,7 @@ let additionalContext = "";
 let contextValue = 10;
 let hasUnifiedContext = false;
 let continueMessage: string | undefined;
+let colorMode: ColorMode = "auto";
 
 const args = process.argv.slice(2);
 let i = 0;
@@ -91,6 +95,21 @@ while (i < args.length) {
 			modelId = args[i];
 			i++;
 			break;
+		case "--color":
+			i++;
+			if (i >= args.length) {
+				console.error("Missing value for --color");
+				usage(1);
+			}
+			if (!["auto", "always", "never"].includes(args[i])) {
+				console.error(
+					`Invalid value for --color: ${args[i]}. Must be: auto, always, never`,
+				);
+				process.exit(1);
+			}
+			colorMode = args[i] as ColorMode;
+			i++;
+			break;
 		case "-c":
 		case "--continue":
 			i++;
@@ -124,6 +143,19 @@ while (i < args.length) {
 			i++;
 			break;
 		default:
+			// Check for --color=* patterns
+			if (arg.startsWith("--color=")) {
+				const value = arg.slice("--color=".length);
+				if (!["auto", "always", "never"].includes(value)) {
+					console.error(
+						`Invalid value for --color: ${value}. Must be: auto, always, never`,
+					);
+					process.exit(1);
+				}
+				colorMode = value as ColorMode;
+				i++;
+				break;
+			}
 			// Check for -U flags (unified context)
 			if (arg.match(/^-U\d+$/)) {
 				hasUnifiedContext = true;
@@ -152,7 +184,7 @@ const cwd = process.cwd();
 
 // Handle continue mode
 if (continueMessage) {
-	continueReview({ message: continueMessage, cwd, modelId, quiet }).catch(
+	continueReview({ message: continueMessage, cwd, modelId, quiet, colorMode }).catch(
 		(err) => {
 			console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
 			process.exit(1);
@@ -199,6 +231,7 @@ if (continueMessage) {
 		verbose,
 		quiet,
 		additionalContext,
+		colorMode,
 	}).catch((err) => {
 		console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
 		process.exit(1);
