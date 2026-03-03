@@ -21,6 +21,7 @@ Options:
   -q, --quiet         Suppress progress output (spinners, status messages)
   -v, --verbose       Show each sub-agent's output before the summary
   -h, --help          Show this help message
+  --version           Show version number
 
 Examples:
   pr-review main
@@ -60,6 +61,10 @@ while (i < args.length) {
 		case "-h":
 		case "--help":
 			usage(0);
+			break;
+		case "--version":
+			console.log("0.4.0");
+			process.exit(0);
 			break;
 		case "-v":
 		case "--verbose":
