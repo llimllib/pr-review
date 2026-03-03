@@ -88,6 +88,16 @@ spinner.stop();  // Clear without message
 ./pr-review -q -a bug HEAD~1
 ```
 
+## Development Workflow
+
+**Before committing any changes, you MUST run:**
+
+```bash
+make lint
+```
+
+This runs biome to check code formatting and linting. Fix any issues before committing.
+
 ## Common Tasks
 
 ### Adding a new agent

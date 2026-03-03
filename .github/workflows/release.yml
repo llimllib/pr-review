@@ -25,10 +25,10 @@ jobs:
       - name: Setup Node (for biome)
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: latest
