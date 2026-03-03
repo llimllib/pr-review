@@ -125,7 +125,7 @@ async function runSubAgent(
 	});
 
 	let result = "";
-	session.subscribe((event) => {
+	const unsubscribe = session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
 			event.assistantMessageEvent.type === "text_delta"
@@ -143,6 +143,7 @@ async function runSubAgent(
 	}
 
 	await session.prompt(prompt);
+	unsubscribe();
 	session.dispose();
 
 	spinner?.succeed(agent.name);
@@ -183,7 +184,7 @@ async function runSummarizer(
 	});
 
 	let firstChunk = true;
-	session.subscribe((event) => {
+	const unsubscribe = session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
 			event.assistantMessageEvent.type === "text_delta"
@@ -203,6 +204,7 @@ async function runSummarizer(
 	}
 
 	await session.prompt(prompt);
+	unsubscribe();
 	session.dispose();
 
 	// Copy the session file to our known location
@@ -249,7 +251,7 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 
 	const outputWriter = createOutputWriter(colorMode);
 
-	session.subscribe((event) => {
+	const unsubscribe = session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
 			event.assistantMessageEvent.type === "text_delta"
@@ -259,6 +261,7 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 	});
 
 	await session.prompt(message);
+	unsubscribe();
 	session.dispose();
 	await outputWriter.end();
 	process.stdout.write("\n");
