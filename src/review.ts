@@ -278,7 +278,9 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 	unsubscribe();
 	session.dispose();
 	await outputWriter.end();
-	process.stdout.write("\n");
+	if (!outputWriter.endsWithNewline()) {
+		process.stdout.write("\n");
+	}
 }
 
 export async function runReview(options: ReviewOptions): Promise<void> {
@@ -324,17 +326,22 @@ function helper() {
 3. Review security implications
 `;
 
-		// Simulate streaming by writing chunks
-		const chunks = mockOutput.match(/.{1,50}/g) || [];
-		for (const chunk of chunks) {
-			outputWriter.write(chunk);
+		// Simulate streaming by writing line by line
+		const lines = mockOutput.split('\n');
+		for (let i = 0; i < lines.length; i++) {
+			outputWriter.write(lines[i]);
+			if (i < lines.length - 1) {
+				outputWriter.write('\n');
+			}
 			await new Promise((r) => setTimeout(r, 5));
 		}
 
 		debug("TEST_MODE: calling outputWriter.end()");
 		await outputWriter.end();
 		debug("TEST_MODE: outputWriter.end() complete");
-		process.stdout.write("\n");
+		if (!outputWriter.endsWithNewline()) {
+			process.stdout.write("\n");
+		}
 		debug("TEST_MODE: complete");
 		return;
 	}
@@ -431,6 +438,8 @@ function helper() {
 	debug("runReview: runSummarizer complete, calling outputWriter.end()");
 	await outputWriter.end();
 	debug("runReview: outputWriter.end() complete");
-	process.stdout.write("\n");
+	if (!outputWriter.endsWithNewline()) {
+		process.stdout.write("\n");
+	}
 	debug("runReview: complete");
 }

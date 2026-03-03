@@ -38,11 +38,21 @@ function shouldUseColor(colorMode: ColorMode): boolean {
 export interface OutputWriter {
 	write(text: string): void;
 	end(): Promise<void>;
+	endsWithNewline(): boolean;
 }
 
 class PlainWriter implements OutputWriter {
+	private lastChar = "";
+
 	write(text: string): void {
 		process.stdout.write(text);
+		if (text.length > 0) {
+			this.lastChar = text[text.length - 1];
+		}
+	}
+
+	endsWithNewline(): boolean {
+		return this.lastChar === "\n";
 	}
 
 	async end(): Promise<void> {
@@ -55,6 +65,7 @@ class PipedWriter implements OutputWriter {
 	private stdin: Writable;
 	private exitPromise: Promise<void>;
 	private cmd: string;
+	private lastChar = "";
 
 	constructor(cmd: string, args: string[]) {
 		this.cmd = cmd;
@@ -82,6 +93,13 @@ class PipedWriter implements OutputWriter {
 
 	write(text: string): void {
 		this.stdin.write(text);
+		if (text.length > 0) {
+			this.lastChar = text[text.length - 1];
+		}
+	}
+
+	endsWithNewline(): boolean {
+		return this.lastChar === "\n";
 	}
 
 	async end(): Promise<void> {
