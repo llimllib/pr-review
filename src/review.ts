@@ -66,15 +66,18 @@ async function resolveModel(
 	modelRegistry: ModelRegistry,
 	modelId?: string,
 ) {
-	if (modelId) {
+	// Check environment variable if no explicit model provided
+	const effectiveModelId = modelId ?? process.env.PR_REVIEW_MODEL;
+
+	if (effectiveModelId) {
 		// Try to find by id across all providers
 		const available = await modelRegistry.getAvailable();
 		for (const m of available) {
-			if (m.id === modelId || `${m.provider}/${m.id}` === modelId) {
+			if (m.id === effectiveModelId || `${m.provider}/${m.id}` === effectiveModelId) {
 				return m;
 			}
 		}
-		throw new Error(`Model "${modelId}" not found or no API key available`);
+		throw new Error(`Model "${effectiveModelId}" not found or no API key available`);
 	}
 
 	// Default: try sonnet first, then whatever is available

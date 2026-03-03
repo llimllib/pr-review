@@ -17,7 +17,7 @@ Options:
                       Uses mdriver or bat if available. Respects NO_COLOR env var.
   --context TEXT      Additional context for the review
   --context -         Read additional context from stdin
-  -m, --model ID      Model to use (default: claude-sonnet-4-20250514)
+  -m, --model ID      Model to use (see Models section below)
   -q, --quiet         Suppress progress output (spinners, status messages)
   -v, --verbose       Show each sub-agent's output before the summary
   -h, --help          Show this help message
@@ -37,7 +37,19 @@ Examples:
 
 Files:
   ~/.cache/pr-review/                    Session history directory
-  ~/.cache/pr-review/last-session.jsonl  Most recent review session`);
+  ~/.cache/pr-review/last-session.jsonl  Most recent review session
+
+Models:
+  The model is selected in this order of priority:
+    1. -m/--model flag
+    2. PR_REVIEW_MODEL environment variable
+    3. claude-sonnet-4-20250514 (if ANTHROPIC_API_KEY is set)
+    4. First available model from configured API keys
+
+  Model format: "provider/model-id" or just "model-id"
+  Examples: anthropic/claude-sonnet-4-20250514, gpt-4o, bedrock/anthropic.claude-3-sonnet
+
+  Note: This tool does not read pi's default model setting.`);
 	process.exit(exitCode);
 }
 
