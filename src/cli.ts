@@ -32,7 +32,11 @@ Examples:
   
   # Continue chatting about the last review
   pr-review -c "What about edge cases in the auth flow?"
-  pr-review -c "Can you show me a code example for fix #2?"`);
+  pr-review -c "Can you show me a code example for fix #2?"
+
+Files:
+  ~/.cache/pr-review/                    Session history directory
+  ~/.cache/pr-review/last-session.jsonl  Most recent review session`);
 	process.exit(exitCode);
 }
 
