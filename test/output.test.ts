@@ -1,22 +1,15 @@
 import { describe, test, expect } from "bun:test";
-import { execSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 
-function commandExists(cmd: string): boolean {
-	try {
-		execSync(`which ${cmd}`, { stdio: "ignore" });
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-const hasMdriver = commandExists("mdriver");
-
-// Test the PipedWriter behavior directly
-describe("PipedWriter with mdriver", () => {
-	test.skipIf(!hasMdriver)("exits cleanly after streaming content", async () => {
-		const proc = spawn("mdriver", ["--color", "always"], {
+describe("PipedWriter", () => {
+	test("exits cleanly after streaming", async () => {
+		const proc = spawn("cat", [], {
 			stdio: ["pipe", "pipe", "pipe"],
+		});
+
+		let output = "";
+		proc.stdout.on("data", (data) => {
+			output += data.toString();
 		});
 
 		const exitPromise = new Promise<number>((resolve, reject) => {
@@ -24,22 +17,24 @@ describe("PipedWriter with mdriver", () => {
 			proc.on("error", reject);
 		});
 
-		// Simulate streaming writes like the real code does
-		proc.stdin.write("# Hello\n\n");
-		await new Promise((r) => setTimeout(r, 10));
-		proc.stdin.write("This is **bold** text.\n");
-		await new Promise((r) => setTimeout(r, 10));
-		proc.stdin.write("\nDone!\n");
-
+		proc.stdin.write("line 1\n");
+		proc.stdin.write("line 2\n");
+		proc.stdin.write("line 3\n");
 		proc.stdin.end();
 
 		const code = await exitPromise;
 		expect(code).toBe(0);
+		expect(output).toBe("line 1\nline 2\nline 3\n");
 	});
 
-	test.skipIf(!hasMdriver)("exits cleanly with large content", async () => {
-		const proc = spawn("mdriver", ["--color", "always"], {
+	test("exits cleanly with large content", async () => {
+		const proc = spawn("cat", [], {
 			stdio: ["pipe", "pipe", "pipe"],
+		});
+
+		let output = "";
+		proc.stdout.on("data", (data) => {
+			output += data.toString();
 		});
 
 		const exitPromise = new Promise<number>((resolve, reject) => {
@@ -47,7 +42,6 @@ describe("PipedWriter with mdriver", () => {
 			proc.on("error", reject);
 		});
 
-		// Write a larger chunk of markdown
 		const content = `# Code Review Summary
 
 ## Critical Issues
@@ -73,11 +67,10 @@ This code needs work.
 
 		const code = await exitPromise;
 		expect(code).toBe(0);
+		expect(output).toBe(content);
 	});
-});
 
-describe("PipedWriter with cat (simple pipe test)", () => {
-	test("exits cleanly after streaming", async () => {
+	test("handles streaming writes with delays", async () => {
 		const proc = spawn("cat", [], {
 			stdio: ["pipe", "pipe", "pipe"],
 		});
@@ -92,13 +85,17 @@ describe("PipedWriter with cat (simple pipe test)", () => {
 			proc.on("error", reject);
 		});
 
-		proc.stdin.write("line 1\n");
-		proc.stdin.write("line 2\n");
-		proc.stdin.write("line 3\n");
+		// Simulate streaming writes like the real code does
+		proc.stdin.write("# Hello\n\n");
+		await new Promise((r) => setTimeout(r, 10));
+		proc.stdin.write("This is **bold** text.\n");
+		await new Promise((r) => setTimeout(r, 10));
+		proc.stdin.write("\nDone!\n");
+
 		proc.stdin.end();
 
 		const code = await exitPromise;
 		expect(code).toBe(0);
-		expect(output).toBe("line 1\nline 2\nline 3\n");
+		expect(output).toBe("# Hello\n\nThis is **bold** text.\n\nDone!\n");
 	});
 });
