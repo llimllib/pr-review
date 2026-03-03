@@ -2,6 +2,10 @@
 
 This file provides context for AI assistants working on this codebase.
 
+## Important Rules
+
+**Never commit to main and push without explicit permission.** Always create a branch and PR for changes, or ask before pushing to main.
+
 ## Project Overview
 
 `pr-review` is a CLI tool that runs multiple specialized AI agents to review git diffs. It's built with TypeScript, bundled with esbuild, and compiled to a standalone binary with Bun.
