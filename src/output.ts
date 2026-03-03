@@ -3,6 +3,14 @@ import type { Writable } from "node:stream";
 
 export type ColorMode = "auto" | "always" | "never";
 
+const DEBUG = process.env.PR_REVIEW_DEBUG === "1";
+
+function debug(msg: string): void {
+	if (DEBUG) {
+		process.stderr.write(`[DEBUG output] ${msg}\n`);
+	}
+}
+
 function commandExists(cmd: string): boolean {
 	try {
 		execSync(`which ${cmd}`, { stdio: "ignore" });
@@ -38,7 +46,7 @@ class PlainWriter implements OutputWriter {
 	}
 
 	async end(): Promise<void> {
-		// Nothing to do
+		debug("PlainWriter.end()");
 	}
 }
 
@@ -46,8 +54,11 @@ class PipedWriter implements OutputWriter {
 	private process: ReturnType<typeof spawn>;
 	private stdin: Writable;
 	private exitPromise: Promise<void>;
+	private cmd: string;
 
 	constructor(cmd: string, args: string[]) {
+		this.cmd = cmd;
+		debug(`PipedWriter: spawning ${cmd} ${args.join(" ")}`);
 		this.process = spawn(cmd, args, {
 			stdio: ["pipe", "inherit", "inherit"],
 		});
@@ -55,13 +66,17 @@ class PipedWriter implements OutputWriter {
 
 		this.exitPromise = new Promise((resolve, reject) => {
 			this.process.on("close", (code) => {
+				debug(`PipedWriter: ${cmd} closed with code ${code}`);
 				if (code === 0) {
 					resolve();
 				} else {
 					reject(new Error(`${cmd} exited with code ${code}`));
 				}
 			});
-			this.process.on("error", reject);
+			this.process.on("error", (err) => {
+				debug(`PipedWriter: ${cmd} error: ${err}`);
+				reject(err);
+			});
 		});
 	}
 
@@ -70,23 +85,31 @@ class PipedWriter implements OutputWriter {
 	}
 
 	async end(): Promise<void> {
+		debug(`PipedWriter.end(): calling stdin.end() for ${this.cmd}`);
 		this.stdin.end();
+		debug(`PipedWriter.end(): waiting for ${this.cmd} to exit`);
 		await this.exitPromise;
+		debug(`PipedWriter.end(): ${this.cmd} exited`);
 	}
 }
 
 export function createOutputWriter(colorMode: ColorMode): OutputWriter {
+	debug(`createOutputWriter: colorMode=${colorMode}`);
+	
 	if (!shouldUseColor(colorMode)) {
+		debug("createOutputWriter: using PlainWriter (no color)");
 		return new PlainWriter();
 	}
 
 	// Try mdriver first
 	if (commandExists("mdriver")) {
+		debug("createOutputWriter: using PipedWriter with mdriver");
 		return new PipedWriter("mdriver", ["--color", "always"]);
 	}
 
 	// Fall back to bat
 	if (commandExists("bat")) {
+		debug("createOutputWriter: using PipedWriter with bat");
 		return new PipedWriter("bat", [
 			"--language",
 			"markdown",
@@ -100,5 +123,6 @@ export function createOutputWriter(colorMode: ColorMode): OutputWriter {
 	}
 
 	// No formatter available, use plain output
+	debug("createOutputWriter: using PlainWriter (no formatter found)");
 	return new PlainWriter();
 }

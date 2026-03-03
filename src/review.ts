@@ -19,6 +19,14 @@ import type { ColorMode, OutputWriter } from "./output.ts";
 import { createOutputWriter } from "./output.ts";
 import { createSpinner, type Spinner } from "./spinner.ts";
 
+const DEBUG = process.env.PR_REVIEW_DEBUG === "1";
+
+function debug(msg: string): void {
+	if (DEBUG) {
+		process.stderr.write(`[DEBUG review] ${msg}\n`);
+	}
+}
+
 // Session file for continuing conversations
 const SESSION_DIR = path.join(os.homedir(), ".cache", "pr-review");
 const SESSION_FILE = path.join(SESSION_DIR, "last-session.jsonl");
@@ -203,14 +211,19 @@ async function runSummarizer(
 		prompt += `## ${name}\n\n${report}\n\n---\n\n`;
 	}
 
+	debug("runSummarizer: calling session.prompt()");
 	await session.prompt(prompt);
+	debug("runSummarizer: session.prompt() complete");
 	unsubscribe();
+	debug("runSummarizer: unsubscribed");
 	session.dispose();
+	debug("runSummarizer: session disposed");
 
 	// Copy the session file to our known location
 	if (originalFile && fs.existsSync(originalFile)) {
 		fs.copyFileSync(originalFile, SESSION_FILE);
 	}
+	debug("runSummarizer: complete");
 }
 
 export async function continueReview(options: ContinueOptions): Promise<void> {
@@ -367,6 +380,9 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 		outputWriter,
 		summarizerSpinner,
 	);
+	debug("runReview: runSummarizer complete, calling outputWriter.end()");
 	await outputWriter.end();
+	debug("runReview: outputWriter.end() complete");
 	process.stdout.write("\n");
+	debug("runReview: complete");
 }
