@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import pkg from "../package.json";
 import { ALL_AGENT_NAMES } from "./agents.ts";
 import type { ColorMode } from "./output.ts";
 import { continueReview, runReview } from "./review.ts";
@@ -75,7 +76,7 @@ while (i < args.length) {
 			usage(0);
 			break;
 		case "--version":
-			console.log("0.4.0");
+			console.log(pkg.version);
 			process.exit(0);
 			break;
 		case "-v":
