@@ -1,9 +1,20 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { spawn } from "node:child_process";
+import { describe, test, expect } from "bun:test";
+import { execSync, spawn } from "node:child_process";
+
+function commandExists(cmd: string): boolean {
+	try {
+		execSync(`which ${cmd}`, { stdio: "ignore" });
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+const hasMdriver = commandExists("mdriver");
 
 // Test the PipedWriter behavior directly
 describe("PipedWriter with mdriver", () => {
-	test("exits cleanly after streaming content", async () => {
+	test.skipIf(!hasMdriver)("exits cleanly after streaming content", async () => {
 		const proc = spawn("mdriver", ["--color", "always"], {
 			stdio: ["pipe", "pipe", "pipe"],
 		});
@@ -26,7 +37,7 @@ describe("PipedWriter with mdriver", () => {
 		expect(code).toBe(0);
 	});
 
-	test("exits cleanly with large content", async () => {
+	test.skipIf(!hasMdriver)("exits cleanly with large content", async () => {
 		const proc = spawn("mdriver", ["--color", "always"], {
 			stdio: ["pipe", "pipe", "pipe"],
 		});
