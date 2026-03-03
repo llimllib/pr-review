@@ -19,6 +19,15 @@ import type { ColorMode, OutputWriter } from "./output.ts";
 import { createOutputWriter } from "./output.ts";
 import { createSpinner, type Spinner } from "./spinner.ts";
 
+const DEBUG = process.env.PR_REVIEW_DEBUG === "1";
+const TEST_MODE = process.env.PR_REVIEW_TEST === "1";
+
+function debug(msg: string): void {
+	if (DEBUG) {
+		process.stderr.write(`[DEBUG review] ${msg}\n`);
+	}
+}
+
 // Session file for continuing conversations
 const SESSION_DIR = path.join(os.homedir(), ".cache", "pr-review");
 const SESSION_FILE = path.join(SESSION_DIR, "last-session.jsonl");
@@ -73,11 +82,16 @@ async function resolveModel(
 		// Try to find by id across all providers
 		const available = await modelRegistry.getAvailable();
 		for (const m of available) {
-			if (m.id === effectiveModelId || `${m.provider}/${m.id}` === effectiveModelId) {
+			if (
+				m.id === effectiveModelId ||
+				`${m.provider}/${m.id}` === effectiveModelId
+			) {
 				return m;
 			}
 		}
-		throw new Error(`Model "${effectiveModelId}" not found or no API key available`);
+		throw new Error(
+			`Model "${effectiveModelId}" not found or no API key available`,
+		);
 	}
 
 	// Default: try sonnet first, then whatever is available
@@ -125,7 +139,7 @@ async function runSubAgent(
 	});
 
 	let result = "";
-	session.subscribe((event) => {
+	const unsubscribe = session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
 			event.assistantMessageEvent.type === "text_delta"
@@ -143,6 +157,7 @@ async function runSubAgent(
 	}
 
 	await session.prompt(prompt);
+	unsubscribe();
 	session.dispose();
 
 	spinner?.succeed(agent.name);
@@ -183,7 +198,7 @@ async function runSummarizer(
 	});
 
 	let firstChunk = true;
-	session.subscribe((event) => {
+	const unsubscribe = session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
 			event.assistantMessageEvent.type === "text_delta"
@@ -202,13 +217,19 @@ async function runSummarizer(
 		prompt += `## ${name}\n\n${report}\n\n---\n\n`;
 	}
 
+	debug("runSummarizer: calling session.prompt()");
 	await session.prompt(prompt);
+	debug("runSummarizer: session.prompt() complete");
+	unsubscribe();
+	debug("runSummarizer: unsubscribed");
 	session.dispose();
+	debug("runSummarizer: session disposed");
 
 	// Copy the session file to our known location
 	if (originalFile && fs.existsSync(originalFile)) {
 		fs.copyFileSync(originalFile, SESSION_FILE);
 	}
+	debug("runSummarizer: complete");
 }
 
 export async function continueReview(options: ContinueOptions): Promise<void> {
@@ -249,7 +270,7 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 
 	const outputWriter = createOutputWriter(colorMode);
 
-	session.subscribe((event) => {
+	const unsubscribe = session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
 			event.assistantMessageEvent.type === "text_delta"
@@ -259,9 +280,12 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 	});
 
 	await session.prompt(message);
+	unsubscribe();
 	session.dispose();
 	await outputWriter.end();
-	process.stdout.write("\n");
+	if (!outputWriter.endsWithNewline()) {
+		process.stdout.write("\n");
+	}
 }
 
 export async function runReview(options: ReviewOptions): Promise<void> {
@@ -275,6 +299,57 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 		additionalContext,
 		colorMode,
 	} = options;
+
+	// Test mode: output mock content without calling LLM
+	if (TEST_MODE) {
+		debug("TEST_MODE: skipping LLM calls");
+		const outputWriter = createOutputWriter(colorMode);
+
+		const mockOutput = `# Code Review Summary
+
+## Critical Issues
+- **Bug Found**: Mock issue 1 in the diff
+- **Security**: Mock security concern
+
+## Test Coverage
+- Missing tests for edge cases
+
+## Code Quality
+- Good structure overall
+- Consider extracting helper functions
+
+\`\`\`typescript
+// Example suggestion
+function helper() {
+  return "extracted";
+}
+\`\`\`
+
+## Recommendations
+1. Add unit tests
+2. Fix the bug
+3. Review security implications
+`;
+
+		// Simulate streaming by writing line by line
+		const lines = mockOutput.split("\n");
+		for (let i = 0; i < lines.length; i++) {
+			outputWriter.write(lines[i]);
+			if (i < lines.length - 1) {
+				outputWriter.write("\n");
+			}
+			await new Promise((r) => setTimeout(r, 5));
+		}
+
+		debug("TEST_MODE: calling outputWriter.end()");
+		await outputWriter.end();
+		debug("TEST_MODE: outputWriter.end() complete");
+		if (!outputWriter.endsWithNewline()) {
+			process.stdout.write("\n");
+		}
+		debug("TEST_MODE: complete");
+		return;
+	}
 
 	const spinner = createSpinner("Initializing...", quiet || verbose);
 
@@ -364,6 +439,11 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 		outputWriter,
 		summarizerSpinner,
 	);
+	debug("runReview: runSummarizer complete, calling outputWriter.end()");
 	await outputWriter.end();
-	process.stdout.write("\n");
+	debug("runReview: outputWriter.end() complete");
+	if (!outputWriter.endsWithNewline()) {
+		process.stdout.write("\n");
+	}
+	debug("runReview: complete");
 }

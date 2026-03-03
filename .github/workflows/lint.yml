@@ -23,3 +23,6 @@ jobs:
 
       - name: Run Biome
         run: npx biome check src/
+
+      - name: Run tests
+        run: bun test
