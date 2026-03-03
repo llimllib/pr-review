@@ -113,7 +113,7 @@ class PipedWriter implements OutputWriter {
 
 export function createOutputWriter(colorMode: ColorMode): OutputWriter {
 	debug(`createOutputWriter: colorMode=${colorMode}`);
-	
+
 	if (!shouldUseColor(colorMode)) {
 		debug("createOutputWriter: using PlainWriter (no color)");
 		return new PlainWriter();

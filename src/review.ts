@@ -82,11 +82,16 @@ async function resolveModel(
 		// Try to find by id across all providers
 		const available = await modelRegistry.getAvailable();
 		for (const m of available) {
-			if (m.id === effectiveModelId || `${m.provider}/${m.id}` === effectiveModelId) {
+			if (
+				m.id === effectiveModelId ||
+				`${m.provider}/${m.id}` === effectiveModelId
+			) {
 				return m;
 			}
 		}
-		throw new Error(`Model "${effectiveModelId}" not found or no API key available`);
+		throw new Error(
+			`Model "${effectiveModelId}" not found or no API key available`,
+		);
 	}
 
 	// Default: try sonnet first, then whatever is available
@@ -299,7 +304,7 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 	if (TEST_MODE) {
 		debug("TEST_MODE: skipping LLM calls");
 		const outputWriter = createOutputWriter(colorMode);
-		
+
 		const mockOutput = `# Code Review Summary
 
 ## Critical Issues
@@ -327,11 +332,11 @@ function helper() {
 `;
 
 		// Simulate streaming by writing line by line
-		const lines = mockOutput.split('\n');
+		const lines = mockOutput.split("\n");
 		for (let i = 0; i < lines.length; i++) {
 			outputWriter.write(lines[i]);
 			if (i < lines.length - 1) {
-				outputWriter.write('\n');
+				outputWriter.write("\n");
 			}
 			await new Promise((r) => setTimeout(r, 5));
 		}
@@ -345,7 +350,6 @@ function helper() {
 		debug("TEST_MODE: complete");
 		return;
 	}
-
 
 	const spinner = createSpinner("Initializing...", quiet || verbose);
 
