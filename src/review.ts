@@ -20,6 +20,7 @@ import { createOutputWriter } from "./output.ts";
 import { createSpinner, type Spinner } from "./spinner.ts";
 
 const DEBUG = process.env.PR_REVIEW_DEBUG === "1";
+const TEST_MODE = process.env.PR_REVIEW_TEST === "1";
 
 function debug(msg: string): void {
 	if (DEBUG) {
@@ -291,6 +292,53 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 		additionalContext,
 		colorMode,
 	} = options;
+
+	// Test mode: output mock content without calling LLM
+	if (TEST_MODE) {
+		debug("TEST_MODE: skipping LLM calls");
+		const outputWriter = createOutputWriter(colorMode);
+		
+		const mockOutput = `# Code Review Summary
+
+## Critical Issues
+- **Bug Found**: Mock issue 1 in the diff
+- **Security**: Mock security concern
+
+## Test Coverage
+- Missing tests for edge cases
+
+## Code Quality
+- Good structure overall
+- Consider extracting helper functions
+
+\`\`\`typescript
+// Example suggestion
+function helper() {
+  return "extracted";
+}
+\`\`\`
+
+## Recommendations
+1. Add unit tests
+2. Fix the bug
+3. Review security implications
+`;
+
+		// Simulate streaming by writing chunks
+		const chunks = mockOutput.match(/.{1,50}/g) || [];
+		for (const chunk of chunks) {
+			outputWriter.write(chunk);
+			await new Promise((r) => setTimeout(r, 5));
+		}
+
+		debug("TEST_MODE: calling outputWriter.end()");
+		await outputWriter.end();
+		debug("TEST_MODE: outputWriter.end() complete");
+		process.stdout.write("\n");
+		debug("TEST_MODE: complete");
+		return;
+	}
+
 
 	const spinner = createSpinner("Initializing...", quiet || verbose);
 
