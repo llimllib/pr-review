@@ -1,6 +1,7 @@
 # Scope agent findings to the diff
 
 **Date:** 2025-03-06
+**PR:** https://github.com/llimllib/pr-review/pull/4
 **Branch:** focus
 
 ## Problem
