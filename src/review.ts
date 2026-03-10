@@ -549,6 +549,8 @@ function helper() {
 	debug("runReview: runSummarizer complete, calling outputWriter.end()");
 	await outputWriter.end();
 	debug("runReview: outputWriter.end() complete");
+
+	// Ensure summary output ends with exactly one newline before the hint
 	if (!outputWriter.endsWithNewline()) {
 		process.stdout.write("\n");
 	}
@@ -572,7 +574,7 @@ function helper() {
 
 	// Print hint about HTML report
 	process.stderr.write(
-		`\n\x1b[34mView full report: pr-review --html ${sessionId}\x1b[0m\n`,
+		`\x1b[34mView full report: pr-review --html ${sessionId}\x1b[0m\n`,
 	);
 
 	debug("runReview: complete");

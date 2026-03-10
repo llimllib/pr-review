@@ -234,10 +234,14 @@ if (htmlSessionId) {
 		modelId,
 		quiet,
 		colorMode,
-	}).catch((err) => {
-		console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
-		process.exit(1);
-	});
+	})
+		.then(() => {
+			process.exit(0);
+		})
+		.catch((err) => {
+			console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
+			process.exit(1);
+		});
 } else {
 	// Add default unified context if not specified
 	if (!hasUnifiedContext) {
@@ -280,8 +284,12 @@ if (htmlSessionId) {
 		quiet,
 		additionalContext,
 		colorMode,
-	}).catch((err) => {
-		console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
-		process.exit(1);
-	});
+	})
+		.then(() => {
+			process.exit(0);
+		})
+		.catch((err) => {
+			console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
+			process.exit(1);
+		});
 }
