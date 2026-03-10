@@ -9,8 +9,8 @@ import type { ResourceLoader } from "@mariozechner/pi-coding-agent";
 import {
 	AuthStorage,
 	createAgentSession,
+	createExtensionRuntime,
 	createReadOnlyTools,
-	DefaultResourceLoader,
 	ModelRegistry,
 	SessionManager,
 	SettingsManager,
@@ -22,6 +22,8 @@ import {
 } from "./agent-output.ts";
 import type { AgentDefinition } from "./agents.ts";
 import { AGENTS, SUMMARIZER_PROMPT } from "./agents.ts";
+import type { ContextFile } from "./context.ts";
+import { loadProjectContext } from "./context.ts";
 import type { ReviewData } from "./html.ts";
 import { generateHtml } from "./html.ts";
 import type { ColorMode, OutputWriter } from "./output.ts";
@@ -137,49 +139,26 @@ export interface ContinueOptions {
 	noProjectContext?: boolean;
 }
 
-// Maximum size (in bytes) of project context files to include.
-// Files larger than this are truncated and a warning is emitted.
-const MAX_CONTEXT_FILE_BYTES = 8 * 1024; // 8 KB
-
-// Track files we've already warned about to avoid duplicate warnings
-const truncationWarned = new Set<string>();
-
-async function makeResourceLoader(
+function makeResourceLoader(
 	systemPrompt: string,
-	cwd: string,
-	noProjectContext: boolean,
-): Promise<ResourceLoader> {
-	const loader = new DefaultResourceLoader({
-		cwd,
-		systemPrompt,
-		noExtensions: true,
-		noSkills: true,
-		noPromptTemplates: true,
-		noThemes: true,
-		...(noProjectContext
-			? { agentsFilesOverride: () => ({ agentsFiles: [] }) }
-			: {
-					agentsFilesOverride: (base) => ({
-						agentsFiles: base.agentsFiles.map(({ path: filePath, content }) => {
-							if (content.length > MAX_CONTEXT_FILE_BYTES) {
-								if (!truncationWarned.has(filePath)) {
-									truncationWarned.add(filePath);
-									process.stderr.write(
-										`\x1b[33m! Project context file ${filePath} is ${(content.length / 1024).toFixed(1)}KB, truncating to ${MAX_CONTEXT_FILE_BYTES / 1024}KB. Use --no-project-context to skip.\x1b[0m\n`,
-									);
-								}
-								return {
-									path: filePath,
-									content: `${content.slice(0, MAX_CONTEXT_FILE_BYTES)}\n\n[... truncated, file was ${(content.length / 1024).toFixed(1)}KB ...]`,
-								};
-							}
-							return { path: filePath, content };
-						}),
-					}),
-				}),
-	});
-	await loader.reload();
-	return loader;
+	contextFiles: ContextFile[],
+): ResourceLoader {
+	return {
+		getExtensions: () => ({
+			extensions: [],
+			errors: [],
+			runtime: createExtensionRuntime(),
+		}),
+		getSkills: () => ({ skills: [], diagnostics: [] }),
+		getPrompts: () => ({ prompts: [], diagnostics: [] }),
+		getThemes: () => ({ themes: [], diagnostics: [] }),
+		getAgentsFiles: () => ({ agentsFiles: contextFiles }),
+		getSystemPrompt: () => systemPrompt,
+		getAppendSystemPrompt: () => [],
+		getPathMetadata: () => new Map(),
+		extendResources: () => {},
+		reload: async () => {},
+	};
 }
 
 async function resolveModel(
@@ -232,7 +211,7 @@ async function runSubAgent(
 	authStorage: AuthStorage,
 	modelRegistry: ModelRegistry,
 	additionalContext: string,
-	noProjectContext: boolean,
+	contextFiles: ContextFile[],
 	onOutput?: AgentOutputCallback,
 ): Promise<string> {
 	const { session } = await createAgentSession({
@@ -241,11 +220,7 @@ async function runSubAgent(
 		thinkingLevel: "off",
 		authStorage,
 		modelRegistry,
-		resourceLoader: await makeResourceLoader(
-			agent.systemPrompt,
-			cwd,
-			noProjectContext,
-		),
+		resourceLoader: makeResourceLoader(agent.systemPrompt, contextFiles),
 		tools: createReadOnlyTools(cwd),
 		sessionManager: SessionManager.inMemory(),
 		settingsManager: SettingsManager.inMemory({
@@ -296,7 +271,7 @@ async function runSummarizer(
 	modelRegistry: ModelRegistry,
 	outputWriter: OutputWriter,
 	sessionId: string,
-	noProjectContext: boolean,
+	contextFiles: ContextFile[],
 	spinner?: Spinner,
 ): Promise<string> {
 	const sessionDir = getSessionDir(sessionId);
@@ -314,11 +289,7 @@ async function runSummarizer(
 		thinkingLevel: "off",
 		authStorage,
 		modelRegistry,
-		resourceLoader: await makeResourceLoader(
-			SUMMARIZER_PROMPT,
-			cwd,
-			noProjectContext,
-		),
+		resourceLoader: makeResourceLoader(SUMMARIZER_PROMPT, contextFiles),
 		tools: [],
 		sessionManager,
 		settingsManager: SettingsManager.inMemory({
@@ -406,6 +377,9 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 	const modelRegistry = new ModelRegistry(authStorage);
 	const model = await resolveModel(authStorage, modelRegistry, modelId);
 
+	// Load project context files once
+	const contextFiles = await loadProjectContext(cwd, noProjectContext);
+
 	// Open the existing session
 	const sessionManager = SessionManager.open(sessionFile, sessionDir);
 
@@ -415,11 +389,7 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 		thinkingLevel: "off",
 		authStorage,
 		modelRegistry,
-		resourceLoader: await makeResourceLoader(
-			SUMMARIZER_PROMPT,
-			cwd,
-			noProjectContext,
-		),
+		resourceLoader: makeResourceLoader(SUMMARIZER_PROMPT, contextFiles),
 		tools: [],
 		sessionManager,
 		settingsManager: SettingsManager.inMemory({
@@ -520,6 +490,9 @@ function helper() {
 	const modelRegistry = new ModelRegistry(authStorage);
 	const model = await resolveModel(authStorage, modelRegistry, modelId);
 
+	// Load project context files once, shared by all agents
+	const contextFiles = await loadProjectContext(cwd, noProjectContext);
+
 	if (verbose) {
 		process.stderr.write(
 			`\x1b[34m• Using model: ${model.provider}/${model.id}\x1b[0m\n`,
@@ -555,7 +528,7 @@ function helper() {
 			authStorage,
 			modelRegistry,
 			additionalContext,
-			noProjectContext,
+			contextFiles,
 			onOutput,
 		);
 
@@ -595,7 +568,7 @@ function helper() {
 		modelRegistry,
 		outputWriter,
 		sessionId,
-		noProjectContext,
+		contextFiles,
 		summarizerSpinner,
 	);
 	debug("runReview: runSummarizer complete, calling outputWriter.end()");
