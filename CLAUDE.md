@@ -16,6 +16,7 @@ This file provides context for AI assistants working on this codebase.
 src/
 ├── cli.ts      # Argument parsing, main entry point
 ├── agents.ts   # Agent definitions and system prompts
+├── context.ts  # Project context file discovery and truncation
 ├── review.ts   # Core review logic, session management
 └── spinner.ts  # CLI spinner for progress feedback
 ```
@@ -26,9 +27,12 @@ src/
 
 - **Review flow** (`review.ts`):
   1. `runReview()` orchestrates the review process
-  2. `runSubAgent()` runs each agent in parallel with read-only file access
-  3. `runSummarizer()` synthesizes reports and saves session for continuation
-  4. `continueReview()` loads previous session for follow-up questions
+  2. `loadProjectContext()` discovers `AGENTS.md`/`CLAUDE.md` once, shared by all agents
+  3. `runSubAgent()` runs each agent in parallel with read-only file access
+  4. `runSummarizer()` synthesizes reports and saves session for continuation
+  5. `continueReview()` loads previous session for follow-up questions
+
+- **Project context** (`context.ts`): Discovers `AGENTS.md`/`CLAUDE.md` from the project directory (and ancestors) using pi's `DefaultResourceLoader`. Files over 8KB are truncated with a warning. Use `--no-project-context` to skip.
 
 - **Session persistence**: Sessions are saved to `~/.cache/pr-review/last-session.jsonl` using pi's `SessionManager`. This enables the `-c/--continue` feature.
 
@@ -54,10 +58,12 @@ bun build --compile ...       # Creates ./pr-review binary
 ### Agent Sessions
 
 ```typescript
+const contextFiles = await loadProjectContext(cwd, noProjectContext);
+
 const { session } = await createAgentSession({
     cwd,
     model,
-    resourceLoader: makeResourceLoader(systemPrompt),
+    resourceLoader: makeResourceLoader(systemPrompt, contextFiles),
     tools: createReadOnlyTools(cwd),  // or [] for summarizer
     sessionManager: SessionManager.inMemory(),  // or persisted
 });

@@ -42,13 +42,13 @@ describe("processContextFiles", () => {
 
 		expect(result).toHaveLength(1);
 		expect(result[0].path).toBe("/project/CLAUDE.md");
-		// Truncated content should start with the first MAX_CONTEXT_FILE_BYTES bytes
-		expect(result[0].content.startsWith("x".repeat(MAX_CONTEXT_FILE_BYTES))).toBe(true);
 		// Should contain the truncation marker
 		expect(result[0].content).toContain("[... truncated");
 		// Should mention the original size
 		const originalKB = ((MAX_CONTEXT_FILE_BYTES + 1000) / 1024).toFixed(1);
 		expect(result[0].content).toContain(`${originalKB}KB`);
+		// Truncated output should fit within the limit
+		expect(result[0].content.length).toBeLessThanOrEqual(MAX_CONTEXT_FILE_BYTES);
 		// Should be shorter than the original
 		expect(result[0].content.length).toBeLessThan(content.length);
 	});
@@ -78,22 +78,23 @@ describe("processContextFiles", () => {
 		expect(result).toHaveLength(2);
 		// First file unchanged
 		expect(result[0].content).toBe(smallContent);
-		// Second file truncated
+		// Second file truncated and within limit
 		expect(result[1].content).toContain("[... truncated");
+		expect(result[1].content.length).toBeLessThanOrEqual(MAX_CONTEXT_FILE_BYTES);
 		// One warning for the big file
 		expect(warnings).toHaveLength(1);
 		expect(warnings[0]).toContain("/project/sub/AGENTS.md");
 	});
 
 	test("respects custom maxBytes parameter", () => {
-		const content = "abcdefghij"; // 10 bytes
+		const content = "x".repeat(200);
 		const files = [{ path: "/project/CLAUDE.md", content }];
 
-		// With limit of 5
-		const { files: result, warnings } = processContextFiles(files, 5);
+		// With limit of 100
+		const { files: result, warnings } = processContextFiles(files, 100);
 
-		expect(result[0].content.startsWith("abcde")).toBe(true);
 		expect(result[0].content).toContain("[... truncated");
+		expect(result[0].content.length).toBeLessThanOrEqual(100);
 		expect(warnings).toHaveLength(1);
 	});
 
@@ -105,6 +106,18 @@ describe("processContextFiles", () => {
 
 		expect(result[0].content).toBe("12345");
 		expect(warnings).toEqual([]);
+	});
+
+	test("custom maxBytes smaller than marker still works", () => {
+		const content = "abcdefghij"; // 10 bytes
+		const files = [{ path: "/project/CLAUDE.md", content }];
+
+		// Limit of 5 is smaller than the marker itself; should still
+		// produce a truncated result without crashing
+		const { files: result, warnings } = processContextFiles(files, 5);
+
+		expect(result[0].content).toContain("[... truncated");
+		expect(warnings).toHaveLength(1);
 	});
 
 	test("generates separate warnings for multiple truncated files", () => {

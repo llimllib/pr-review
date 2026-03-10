@@ -17,6 +17,7 @@ export interface ProcessedContext {
 /**
  * Process context files: truncate any that exceed the size limit.
  * Returns the processed files and any warning messages (pure function).
+ * The truncated output (including marker) will fit within maxBytes.
  */
 export function processContextFiles(
 	files: ContextFile[],
@@ -25,12 +26,14 @@ export function processContextFiles(
 	const warnings: string[] = [];
 	const processed = files.map(({ path: filePath, content }) => {
 		if (content.length > maxBytes) {
+			const marker = `\n\n[... truncated, file was ${(content.length / 1024).toFixed(1)}KB ...]`;
+			const keepBytes = Math.max(0, maxBytes - marker.length);
 			warnings.push(
 				`Project context file ${filePath} is ${(content.length / 1024).toFixed(1)}KB, truncating to ${maxBytes / 1024}KB. Use --no-project-context to skip.`,
 			);
 			return {
 				path: filePath,
-				content: `${content.slice(0, maxBytes)}\n\n[... truncated, file was ${(content.length / 1024).toFixed(1)}KB ...]`,
+				content: content.slice(0, keepBytes) + marker,
 			};
 		}
 		return { path: filePath, content };
@@ -38,19 +41,25 @@ export function processContextFiles(
 	return { files: processed, warnings };
 }
 
+export interface LoadProjectContextResult {
+	files: ContextFile[];
+	warnings: string[];
+}
+
 /**
  * Discover and load project context files (AGENTS.md / CLAUDE.md) from the
  * project directory and its ancestors, using pi's DefaultResourceLoader.
  *
- * Files exceeding MAX_CONTEXT_FILE_BYTES are truncated with a warning on
- * stderr. Pass noProjectContext=true to skip discovery entirely.
+ * Files exceeding MAX_CONTEXT_FILE_BYTES are truncated. Warnings are returned
+ * (not written to stderr) so the caller can display them at the right time.
+ * Pass noProjectContext=true to skip discovery entirely.
  */
 export async function loadProjectContext(
 	cwd: string,
 	noProjectContext: boolean,
-): Promise<ContextFile[]> {
+): Promise<LoadProjectContextResult> {
 	if (noProjectContext) {
-		return [];
+		return { files: [], warnings: [] };
 	}
 
 	// Use DefaultResourceLoader solely for its context file discovery.
@@ -65,11 +74,5 @@ export async function loadProjectContext(
 	await loader.reload();
 
 	const raw = loader.getAgentsFiles().agentsFiles;
-	const { files, warnings } = processContextFiles(raw);
-
-	for (const warning of warnings) {
-		process.stderr.write(`\x1b[33m! ${warning}\x1b[0m\n`);
-	}
-
-	return files;
+	return processContextFiles(raw);
 }

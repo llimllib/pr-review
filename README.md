@@ -96,6 +96,7 @@ pr-review main -- ':!package-lock.json'
 -c, --continue MSG  Continue chatting about the last review
 --context TEXT      Additional context for the review
 --context -         Read context from stdin
+--no-project-context  Skip auto-including AGENTS.md/CLAUDE.md
 -m, --model ID      Model to use (default: claude-sonnet-4-20250514)
 -q, --quiet         Suppress progress output
 -v, --verbose       Show each agent's raw output
@@ -135,10 +136,19 @@ git log -1 --pretty=%B | pr-review --context - main
 ## How It Works
 
 1. Runs `git diff` with your arguments
-2. Sends the diff to 4 specialized agents in parallel
-3. Each agent can read files in your repo for additional context
-4. A summarizer synthesizes all reports into a prioritized review
-5. Session is saved for follow-up questions with `-c`
+2. Discovers project context files (`AGENTS.md` or `CLAUDE.md`) from your repo
+3. Sends the diff to 4 specialized agents in parallel, each with the project context
+4. Each agent can read files in your repo for additional context
+5. A summarizer synthesizes all reports into a prioritized review
+6. Session is saved for follow-up questions with `-c`
+
+### Project Context
+
+pr-review automatically discovers and includes `AGENTS.md` or `CLAUDE.md` from your project directory (and parent directories) in the system prompt for all agents. This gives agents awareness of your project's conventions, architecture, and guidelines.
+
+- Files are discovered using the same logic as [pi](https://github.com/badlogic/pi-mono): checks for `AGENTS.md` then `CLAUDE.md` in each directory from the working directory up to the root
+- Files larger than 8KB are truncated with a warning
+- Use `--no-project-context` to disable this behavior
 
 ## Development
 

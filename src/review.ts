@@ -378,7 +378,11 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 	const model = await resolveModel(authStorage, modelRegistry, modelId);
 
 	// Load project context files once
-	const contextFiles = await loadProjectContext(cwd, noProjectContext);
+	const { files: contextFiles, warnings: contextWarnings } =
+		await loadProjectContext(cwd, noProjectContext);
+	for (const warning of contextWarnings) {
+		process.stderr.write(`\x1b[33m! ${warning}\x1b[0m\n`);
+	}
 
 	// Open the existing session
 	const sessionManager = SessionManager.open(sessionFile, sessionDir);
@@ -490,8 +494,17 @@ function helper() {
 	const modelRegistry = new ModelRegistry(authStorage);
 	const model = await resolveModel(authStorage, modelRegistry, modelId);
 
-	// Load project context files once, shared by all agents
-	const contextFiles = await loadProjectContext(cwd, noProjectContext);
+	// Load project context files once, shared by all agents.
+	// Display warnings before spinner starts animating agent progress.
+	spinner.update("Loading project context...");
+	const { files: contextFiles, warnings: contextWarnings } =
+		await loadProjectContext(cwd, noProjectContext);
+	if (contextWarnings.length > 0) {
+		spinner.stop();
+		for (const warning of contextWarnings) {
+			process.stderr.write(`\x1b[33m! ${warning}\x1b[0m\n`);
+		}
+	}
 
 	if (verbose) {
 		process.stderr.write(
