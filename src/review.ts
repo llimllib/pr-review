@@ -15,6 +15,11 @@ import {
 	SessionManager,
 	SettingsManager,
 } from "@mariozechner/pi-coding-agent";
+import type { AgentOutputCallback } from "./agent-output.ts";
+import {
+	createSpinnerRenderer,
+	createVerboseRenderer,
+} from "./agent-output.ts";
 import type { AgentDefinition } from "./agents.ts";
 import { AGENTS, SUMMARIZER_PROMPT } from "./agents.ts";
 import type { ReviewData } from "./html.ts";
@@ -199,8 +204,7 @@ async function runSubAgent(
 	authStorage: AuthStorage,
 	modelRegistry: ModelRegistry,
 	additionalContext: string,
-	verbose: boolean,
-	spinner?: Spinner,
+	onOutput?: AgentOutputCallback,
 ): Promise<string> {
 	const { session } = await createAgentSession({
 		cwd,
@@ -224,9 +228,16 @@ async function runSubAgent(
 			event.assistantMessageEvent.type === "text_delta"
 		) {
 			result += event.assistantMessageEvent.delta;
-			if (verbose) {
-				process.stderr.write(event.assistantMessageEvent.delta);
-			}
+			onOutput?.({
+				type: "text_delta",
+				delta: event.assistantMessageEvent.delta,
+			});
+		} else if (event.type === "tool_execution_start") {
+			onOutput?.({
+				type: "tool_start",
+				toolName: event.toolName,
+				args: event.args,
+			});
 		}
 	});
 
@@ -236,10 +247,10 @@ async function runSubAgent(
 	}
 
 	await session.prompt(prompt);
+	onOutput?.({ type: "agent_complete" });
 	unsubscribe();
 	session.dispose();
 
-	spinner?.succeed(agent.name);
 	return result;
 }
 
@@ -468,19 +479,14 @@ function helper() {
 		);
 	}
 
-	// Track completed agents for spinner updates
+	// Track completed agents
 	const completed: string[] = [];
 	const total = agentNames.length;
 
-	const updateSpinner = () => {
-		const remaining = agentNames.filter((n) => !completed.includes(n));
-		if (remaining.length > 0) {
-			const agent = AGENTS[remaining[0]];
-			spinner.update(
-				`Running ${agent?.name ?? remaining[0]}... (${completed.length}/${total})`,
-			);
-		}
-	};
+	// Create the appropriate renderer for agent output
+	const renderer = verbose
+		? createVerboseRenderer()
+		: createSpinnerRenderer(spinner, () => completed.length, total);
 
 	spinner.update(`Running agents... (0/${total})`);
 
@@ -489,9 +495,7 @@ function helper() {
 		const agent = AGENTS[name];
 		if (!agent) throw new Error(`Unknown agent: ${name}`);
 
-		if (verbose) {
-			process.stderr.write(`\x1b[33m━━━ ${agent.name} ━━━\x1b[0m\n`);
-		}
+		const onOutput = renderer.createCallback(agent.name);
 
 		const report = await runSubAgent(
 			agent,
@@ -501,20 +505,16 @@ function helper() {
 			authStorage,
 			modelRegistry,
 			additionalContext,
-			verbose,
+			onOutput,
 		);
 
-		if (verbose) {
-			process.stderr.write(`\n\x1b[33m━━━ end ${agent.name} ━━━\x1b[0m\n\n`);
-		}
-
 		completed.push(name);
-		updateSpinner();
 
 		return [agent.name, report] as const;
 	});
 
 	const results = await Promise.all(agentPromises);
+	renderer.flush();
 	const reports = new Map(results);
 
 	spinner.succeed(`Agents complete (${total}/${total})`);
