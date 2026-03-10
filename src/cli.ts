@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import pkg from "../package.json";
 import { ALL_AGENT_NAMES } from "./agents.ts";
 import type { ColorMode } from "./output.ts";
-import { continueReview, runReview } from "./review.ts";
+import { continueReview, openHtmlReport, runReview } from "./review.ts";
 
 function usage(exitCode: number = 0): never {
 	console.log(`pr-review [options] [git-diff-arguments...]
@@ -18,6 +18,7 @@ Options:
                       Uses mdriver or bat if available. Respects NO_COLOR env var.
   --context TEXT      Additional context for the review
   --context -         Read additional context from stdin
+  --html [ID]         Open the HTML report for a session (default: last)
   -m, --model ID      Model to use (see Models section below)
   -q, --quiet         Suppress progress output (spinners, status messages)
   -v, --verbose       Show each sub-agent's output before the summary
@@ -65,6 +66,7 @@ let contextValue = 10;
 let hasUnifiedContext = false;
 let continueMessage: string | undefined;
 let colorMode: ColorMode = "auto";
+let htmlSessionId: string | undefined;
 
 const args = process.argv.slice(2);
 let i = 0;
@@ -142,6 +144,16 @@ while (i < args.length) {
 			continueMessage = args[i];
 			i++;
 			break;
+		case "--html":
+			i++;
+			// Session ID is optional; default to "last"
+			if (i < args.length && !args[i].startsWith("-")) {
+				htmlSessionId = args[i];
+				i++;
+			} else {
+				htmlSessionId = "last";
+			}
+			break;
 		case "--context":
 			i++;
 			if (i >= args.length) {
@@ -204,18 +216,32 @@ while (i < args.length) {
 
 const cwd = process.cwd();
 
-// Handle continue mode
-if (continueMessage) {
+// Handle HTML report mode
+if (htmlSessionId) {
+	try {
+		openHtmlReport(htmlSessionId);
+	} catch (err) {
+		console.error(
+			`\x1b[31m❌ ${err instanceof Error ? err.message : String(err)}\x1b[0m`,
+		);
+		process.exit(1);
+	}
+} else if (continueMessage) {
+	// Handle continue mode
 	continueReview({
 		message: continueMessage,
 		cwd,
 		modelId,
 		quiet,
 		colorMode,
-	}).catch((err) => {
-		console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
-		process.exit(1);
-	});
+	})
+		.then(() => {
+			process.exit(0);
+		})
+		.catch((err) => {
+			console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
+			process.exit(1);
+		});
 } else {
 	// Add default unified context if not specified
 	if (!hasUnifiedContext) {
@@ -258,8 +284,12 @@ if (continueMessage) {
 		quiet,
 		additionalContext,
 		colorMode,
-	}).catch((err) => {
-		console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
-		process.exit(1);
-	});
+	})
+		.then(() => {
+			process.exit(0);
+		})
+		.catch((err) => {
+			console.error(`\x1b[31m❌ ${err.message}\x1b[0m`);
+			process.exit(1);
+		});
 }

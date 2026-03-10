@@ -1,3 +1,5 @@
+import { execSync } from "node:child_process";
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -15,6 +17,8 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { AgentDefinition } from "./agents.ts";
 import { AGENTS, SUMMARIZER_PROMPT } from "./agents.ts";
+import type { ReviewData } from "./html.ts";
+import { generateHtml } from "./html.ts";
 import type { ColorMode, OutputWriter } from "./output.ts";
 import { createOutputWriter } from "./output.ts";
 import { createSpinner, type Spinner } from "./spinner.ts";
@@ -28,9 +32,84 @@ function debug(msg: string): void {
 	}
 }
 
-// Session file for continuing conversations
-const SESSION_DIR = path.join(os.homedir(), ".cache", "pr-review");
-const SESSION_FILE = path.join(SESSION_DIR, "last-session.jsonl");
+// Session storage
+const CACHE_DIR = path.join(os.homedir(), ".cache", "pr-review");
+const LAST_LINK = path.join(CACHE_DIR, "last");
+
+// Legacy session file location (for backward compatibility with --continue)
+const LEGACY_SESSION_FILE = path.join(CACHE_DIR, "last-session.jsonl");
+
+function uuidv7(): string {
+	// UUIDv7: 48-bit timestamp + 4-bit version + 12-bit rand_a + 2-bit variant + 62-bit rand_b
+	const now = Date.now();
+	const bytes = crypto.getRandomValues(new Uint8Array(16));
+
+	// Timestamp (48 bits, big-endian) in bytes 0-5
+	bytes[0] = (now / 2 ** 40) & 0xff;
+	bytes[1] = (now / 2 ** 32) & 0xff;
+	bytes[2] = (now / 2 ** 24) & 0xff;
+	bytes[3] = (now / 2 ** 16) & 0xff;
+	bytes[4] = (now / 2 ** 8) & 0xff;
+	bytes[5] = now & 0xff;
+
+	// Version 7 (4 bits)
+	bytes[6] = (bytes[6] & 0x0f) | 0x70;
+	// Variant 10 (2 bits)
+	bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+	const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(
+		"",
+	);
+	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function getSessionDir(sessionId: string): string {
+	return path.join(CACHE_DIR, sessionId);
+}
+
+function getSessionFile(sessionId: string): string {
+	return path.join(getSessionDir(sessionId), "session.jsonl");
+}
+
+function getReportsFile(sessionId: string): string {
+	return path.join(getSessionDir(sessionId), "reports.json");
+}
+
+function getHtmlFile(sessionId: string): string {
+	return path.join(getSessionDir(sessionId), "review.html");
+}
+
+function updateLastLink(sessionId: string): void {
+	try {
+		fs.rmSync(LAST_LINK, { force: true });
+	} catch {}
+	fs.symlinkSync(sessionId, LAST_LINK);
+}
+
+/** Resolve a session ID, handling "last" and the symlink. */
+export function resolveSessionId(idOrLast: string): string {
+	if (idOrLast === "last") {
+		if (!fs.existsSync(LAST_LINK)) {
+			throw new Error(
+				"No previous review session found. Run a review first with: pr-review <git-diff-args>",
+			);
+		}
+		return fs.readlinkSync(LAST_LINK);
+	}
+	return idOrLast;
+}
+
+/** Open the HTML report for a session. */
+export function openHtmlReport(sessionId: string): void {
+	const resolved = resolveSessionId(sessionId);
+	const htmlFile = getHtmlFile(resolved);
+	if (!fs.existsSync(htmlFile)) {
+		throw new Error(
+			`No HTML report found for session ${resolved}. Was this review run with an older version?`,
+		);
+	}
+	execSync(`open ${JSON.stringify(htmlFile)}`, { stdio: "ignore" });
+}
 
 export interface ReviewOptions {
 	diff: string;
@@ -172,13 +251,15 @@ async function runSummarizer(
 	authStorage: AuthStorage,
 	modelRegistry: ModelRegistry,
 	outputWriter: OutputWriter,
+	sessionId: string,
 	spinner?: Spinner,
-): Promise<void> {
+): Promise<string> {
+	const sessionDir = getSessionDir(sessionId);
 	// Ensure session directory exists
-	fs.mkdirSync(SESSION_DIR, { recursive: true });
+	fs.mkdirSync(sessionDir, { recursive: true });
 
 	// Create a persistent session for the summarizer
-	const sessionManager = SessionManager.create(cwd, SESSION_DIR);
+	const sessionManager = SessionManager.create(cwd, sessionDir);
 	// Rename the session file to our known location for easy continuation
 	const originalFile = sessionManager.getSessionFile();
 
@@ -198,6 +279,7 @@ async function runSummarizer(
 	});
 
 	let firstChunk = true;
+	let summaryText = "";
 	const unsubscribe = session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
@@ -207,6 +289,7 @@ async function runSummarizer(
 				spinner?.stop();
 				firstChunk = false;
 			}
+			summaryText += event.assistantMessageEvent.delta;
 			outputWriter.write(event.assistantMessageEvent.delta);
 		}
 	});
@@ -225,18 +308,37 @@ async function runSummarizer(
 	session.dispose();
 	debug("runSummarizer: session disposed");
 
-	// Copy the session file to our known location
+	// Copy the session file to our known location for easy continuation
+	const sessionFile = getSessionFile(sessionId);
 	if (originalFile && fs.existsSync(originalFile)) {
-		fs.copyFileSync(originalFile, SESSION_FILE);
+		fs.copyFileSync(originalFile, sessionFile);
+		// Also copy to legacy location for backward compatibility
+		fs.copyFileSync(originalFile, LEGACY_SESSION_FILE);
 	}
 	debug("runSummarizer: complete");
+	return summaryText;
 }
 
 export async function continueReview(options: ContinueOptions): Promise<void> {
 	const { message, cwd, modelId, quiet = false, colorMode = "auto" } = options;
 
-	// Check if we have a previous session
-	if (!fs.existsSync(SESSION_FILE)) {
+	// Check if we have a previous session — try new location first, then legacy
+	let sessionFile: string;
+	let sessionDir: string;
+	if (fs.existsSync(LAST_LINK)) {
+		const lastId = fs.readlinkSync(LAST_LINK);
+		sessionDir = getSessionDir(lastId);
+		sessionFile = getSessionFile(lastId);
+	} else if (fs.existsSync(LEGACY_SESSION_FILE)) {
+		sessionDir = CACHE_DIR;
+		sessionFile = LEGACY_SESSION_FILE;
+	} else {
+		throw new Error(
+			"No previous review session found. Run a review first with: pr-review <git-diff-args>",
+		);
+	}
+
+	if (!fs.existsSync(sessionFile)) {
 		throw new Error(
 			"No previous review session found. Run a review first with: pr-review <git-diff-args>",
 		);
@@ -249,7 +351,7 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 	const model = await resolveModel(authStorage, modelRegistry, modelId);
 
 	// Open the existing session
-	const sessionManager = SessionManager.open(SESSION_FILE, SESSION_DIR);
+	const sessionManager = SessionManager.open(sessionFile, sessionDir);
 
 	const { session } = await createAgentSession({
 		cwd,
@@ -428,8 +530,12 @@ function helper() {
 
 	const outputWriter = createOutputWriter(colorMode);
 
+	// Generate a session ID for this review
+	const sessionId = uuidv7();
+	const modelLabel = `${model.provider}/${model.id}`;
+
 	// Run summarizer
-	await runSummarizer(
+	const summaryText = await runSummarizer(
 		diff,
 		reports,
 		cwd,
@@ -437,13 +543,39 @@ function helper() {
 		authStorage,
 		modelRegistry,
 		outputWriter,
+		sessionId,
 		summarizerSpinner,
 	);
 	debug("runReview: runSummarizer complete, calling outputWriter.end()");
 	await outputWriter.end();
 	debug("runReview: outputWriter.end() complete");
+
+	// Ensure summary output ends with exactly one newline before the hint
 	if (!outputWriter.endsWithNewline()) {
 		process.stdout.write("\n");
 	}
+
+	// Save reports and generate HTML
+	const reviewData: ReviewData = {
+		id: sessionId,
+		timestamp: new Date().toISOString(),
+		model: modelLabel,
+		agents: Array.from(reports.keys()),
+		diff,
+		reports: Object.fromEntries(reports),
+		summary: summaryText,
+	};
+
+	const sessionDir = getSessionDir(sessionId);
+	fs.mkdirSync(sessionDir, { recursive: true });
+	fs.writeFileSync(getReportsFile(sessionId), JSON.stringify(reviewData));
+	fs.writeFileSync(getHtmlFile(sessionId), generateHtml(reviewData));
+	updateLastLink(sessionId);
+
+	// Print hint about HTML report
+	process.stderr.write(
+		`\x1b[34mView full report: pr-review --html ${sessionId}\x1b[0m\n`,
+	);
+
 	debug("runReview: complete");
 }
