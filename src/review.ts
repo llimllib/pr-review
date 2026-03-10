@@ -22,6 +22,8 @@ import {
 } from "./agent-output.ts";
 import type { AgentDefinition } from "./agents.ts";
 import { AGENTS, SUMMARIZER_PROMPT } from "./agents.ts";
+import type { ContextFile } from "./context.ts";
+import { loadProjectContext } from "./context.ts";
 import type { ReviewData } from "./html.ts";
 import { generateHtml } from "./html.ts";
 import type { ColorMode, OutputWriter } from "./output.ts";
@@ -125,6 +127,7 @@ export interface ReviewOptions {
 	quiet: boolean;
 	additionalContext: string;
 	colorMode: ColorMode;
+	noProjectContext: boolean;
 }
 
 export interface ContinueOptions {
@@ -133,9 +136,13 @@ export interface ContinueOptions {
 	modelId?: string;
 	quiet?: boolean;
 	colorMode?: ColorMode;
+	noProjectContext?: boolean;
 }
 
-function makeResourceLoader(systemPrompt: string): ResourceLoader {
+function makeResourceLoader(
+	systemPrompt: string,
+	contextFiles: ContextFile[],
+): ResourceLoader {
 	return {
 		getExtensions: () => ({
 			extensions: [],
@@ -145,7 +152,7 @@ function makeResourceLoader(systemPrompt: string): ResourceLoader {
 		getSkills: () => ({ skills: [], diagnostics: [] }),
 		getPrompts: () => ({ prompts: [], diagnostics: [] }),
 		getThemes: () => ({ themes: [], diagnostics: [] }),
-		getAgentsFiles: () => ({ agentsFiles: [] }),
+		getAgentsFiles: () => ({ agentsFiles: contextFiles }),
 		getSystemPrompt: () => systemPrompt,
 		getAppendSystemPrompt: () => [],
 		getPathMetadata: () => new Map(),
@@ -204,6 +211,7 @@ async function runSubAgent(
 	authStorage: AuthStorage,
 	modelRegistry: ModelRegistry,
 	additionalContext: string,
+	contextFiles: ContextFile[],
 	onOutput?: AgentOutputCallback,
 ): Promise<string> {
 	const { session } = await createAgentSession({
@@ -212,7 +220,7 @@ async function runSubAgent(
 		thinkingLevel: "off",
 		authStorage,
 		modelRegistry,
-		resourceLoader: makeResourceLoader(agent.systemPrompt),
+		resourceLoader: makeResourceLoader(agent.systemPrompt, contextFiles),
 		tools: createReadOnlyTools(cwd),
 		sessionManager: SessionManager.inMemory(),
 		settingsManager: SettingsManager.inMemory({
@@ -263,6 +271,7 @@ async function runSummarizer(
 	modelRegistry: ModelRegistry,
 	outputWriter: OutputWriter,
 	sessionId: string,
+	contextFiles: ContextFile[],
 	spinner?: Spinner,
 ): Promise<string> {
 	const sessionDir = getSessionDir(sessionId);
@@ -280,7 +289,7 @@ async function runSummarizer(
 		thinkingLevel: "off",
 		authStorage,
 		modelRegistry,
-		resourceLoader: makeResourceLoader(SUMMARIZER_PROMPT),
+		resourceLoader: makeResourceLoader(SUMMARIZER_PROMPT, contextFiles),
 		tools: [],
 		sessionManager,
 		settingsManager: SettingsManager.inMemory({
@@ -331,7 +340,14 @@ async function runSummarizer(
 }
 
 export async function continueReview(options: ContinueOptions): Promise<void> {
-	const { message, cwd, modelId, quiet = false, colorMode = "auto" } = options;
+	const {
+		message,
+		cwd,
+		modelId,
+		quiet = false,
+		colorMode = "auto",
+		noProjectContext = false,
+	} = options;
 
 	// Check if we have a previous session — try new location first, then legacy
 	let sessionFile: string;
@@ -361,6 +377,13 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 	const modelRegistry = new ModelRegistry(authStorage);
 	const model = await resolveModel(authStorage, modelRegistry, modelId);
 
+	// Load project context files once
+	const { files: contextFiles, warnings: contextWarnings } =
+		await loadProjectContext(cwd, noProjectContext);
+	for (const warning of contextWarnings) {
+		process.stderr.write(`\x1b[33m! ${warning}\x1b[0m\n`);
+	}
+
 	// Open the existing session
 	const sessionManager = SessionManager.open(sessionFile, sessionDir);
 
@@ -370,7 +393,7 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 		thinkingLevel: "off",
 		authStorage,
 		modelRegistry,
-		resourceLoader: makeResourceLoader(SUMMARIZER_PROMPT),
+		resourceLoader: makeResourceLoader(SUMMARIZER_PROMPT, contextFiles),
 		tools: [],
 		sessionManager,
 		settingsManager: SettingsManager.inMemory({
@@ -411,6 +434,7 @@ export async function runReview(options: ReviewOptions): Promise<void> {
 		quiet,
 		additionalContext,
 		colorMode,
+		noProjectContext,
 	} = options;
 
 	// Test mode: output mock content without calling LLM
@@ -470,6 +494,18 @@ function helper() {
 	const modelRegistry = new ModelRegistry(authStorage);
 	const model = await resolveModel(authStorage, modelRegistry, modelId);
 
+	// Load project context files once, shared by all agents.
+	// Display warnings before spinner starts animating agent progress.
+	spinner.update("Loading project context...");
+	const { files: contextFiles, warnings: contextWarnings } =
+		await loadProjectContext(cwd, noProjectContext);
+	if (contextWarnings.length > 0) {
+		spinner.stop();
+		for (const warning of contextWarnings) {
+			process.stderr.write(`\x1b[33m! ${warning}\x1b[0m\n`);
+		}
+	}
+
 	if (verbose) {
 		process.stderr.write(
 			`\x1b[34m• Using model: ${model.provider}/${model.id}\x1b[0m\n`,
@@ -505,6 +541,7 @@ function helper() {
 			authStorage,
 			modelRegistry,
 			additionalContext,
+			contextFiles,
 			onOutput,
 		);
 
@@ -544,6 +581,7 @@ function helper() {
 		modelRegistry,
 		outputWriter,
 		sessionId,
+		contextFiles,
 		summarizerSpinner,
 	);
 	debug("runReview: runSummarizer complete, calling outputWriter.end()");

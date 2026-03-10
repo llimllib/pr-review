@@ -18,6 +18,7 @@ Options:
                       Uses mdriver or bat if available. Respects NO_COLOR env var.
   --context TEXT      Additional context for the review
   --context -         Read additional context from stdin
+  --no-project-context  Skip auto-including AGENTS.md/CLAUDE.md from the project
   --html [ID]         Open the HTML report for a session (default: last)
   -m, --model ID      Model to use (see Models section below)
   -q, --quiet         Suppress progress output (spinners, status messages)
@@ -67,6 +68,7 @@ let hasUnifiedContext = false;
 let continueMessage: string | undefined;
 let colorMode: ColorMode = "auto";
 let htmlSessionId: string | undefined;
+let noProjectContext = false;
 
 const args = process.argv.slice(2);
 let i = 0;
@@ -142,6 +144,10 @@ while (i < args.length) {
 				usage(1);
 			}
 			continueMessage = args[i];
+			i++;
+			break;
+		case "--no-project-context":
+			noProjectContext = true;
 			i++;
 			break;
 		case "--html":
@@ -234,6 +240,7 @@ if (htmlSessionId) {
 		modelId,
 		quiet,
 		colorMode,
+		noProjectContext,
 	})
 		.then(() => {
 			process.exit(0);
@@ -284,6 +291,7 @@ if (htmlSessionId) {
 		quiet,
 		additionalContext,
 		colorMode,
+		noProjectContext,
 	})
 		.then(() => {
 			process.exit(0);
