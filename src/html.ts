@@ -119,9 +119,9 @@ export function generateHtml(data: ReviewData): string {
     margin-bottom: 2rem;
   }
 
-  .summary-section h2 {
-    font-size: 1.25rem;
-    font-weight: 600;
+  .summary-heading {
+    font-size: 1.35rem;
+    font-weight: 700;
     margin-bottom: 1rem;
     color: var(--accent);
   }
@@ -244,13 +244,13 @@ export function generateHtml(data: ReviewData): string {
   </div>
 </div>
 
-<div class="summary-section">
-  <h2>Summary</h2>
-  ${summaryHtml}
-</div>
-
 <h2 class="agents-heading">Agent Reports</h2>
 ${agentSections}
+
+<div class="summary-section">
+  <h1 class="summary-heading">Summary Agent Report</h1>
+  ${summaryHtml}
+</div>
 
 </body>
 </html>`;
