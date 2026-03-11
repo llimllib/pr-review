@@ -10,22 +10,18 @@ A CLI tool based on [pi](https://www.npmjs.com/package/@mariozechner/pi-coding-a
 brew install llimllib/tap/pr-review
 ```
 
-You can download a binary from [relases](https://github.com/llimllib/pr-review/releases) if you don't want to use homebrew
+You can download a binary from [releases](https://github.com/llimllib/pr-review/releases) if you don't want to use homebrew
 
 ## The agents
 
 The four sub-agents are:
 
-- [Bug Hunter](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L13)
-    - Finds logic bugs, edge cases, and incorrect assumptions
-- [Test Reviewer](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L38)
-    - Checks test coverage and quality
-- [Impact Analyzer](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L63)
-    - Traces cross-file dependencies and breaking changes
-- [Code Quality](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L91)
-    - Reviews style, conventions, error handling, and maintainability
+- [Bug Hunter](https://github.com/llimllib/pr-review/blob/main/src/agents.ts) — Finds logic bugs, edge cases, and incorrect assumptions
+- [Test Reviewer](https://github.com/llimllib/pr-review/blob/main/src/agents.ts) — Checks test coverage and quality
+- [Impact Analyzer](https://github.com/llimllib/pr-review/blob/main/src/agents.ts) — Traces cross-file dependencies and breaking changes
+- [Code Quality](https://github.com/llimllib/pr-review/blob/main/src/agents.ts) — Reviews style, conventions, error handling, and maintainability
 
-Once the agents have reported their results, they're synthesized by the [summarizer](https://github.com/llimllib/pr-review/blob/12fb5e3b63a184c397789659dbe20dd6be05d81a/src/agents.ts#L121)
+Once the agents have reported their results, they're synthesized by the [summarizer](https://github.com/llimllib/pr-review/blob/main/src/agents.ts)
 
 This setup is heavily inspired by [anthropic's pr-review-toolkit](https://github.com/anthropics/claude-code/tree/main/plugins/pr-review-toolkit)
 
@@ -91,24 +87,39 @@ pr-review main -- ':!package-lock.json'
 ### Options
 
 ```
--a, --agents NAMES  Comma-separated list of agents (default: all)
+-a, --agents NAMES  Comma-separated list of agents to run (default: all)
                     Available: bug, test, impact, quality
 -c, --continue MSG  Continue chatting about the last review
+--color WHEN        When to colorize output: auto, always, never (default: auto)
+                    Uses mdriver or bat if available. Respects NO_COLOR env var.
 --context TEXT      Additional context for the review
---context -         Read context from stdin
---no-project-context  Skip auto-including AGENTS.md/CLAUDE.md
--m, --model ID      Model to use (default: claude-sonnet-4-20250514)
--q, --quiet         Suppress progress output
--v, --verbose       Show each agent's raw output
--h, --help          Show help
+--context -         Read additional context from stdin
+--list-models       List available models and exit
+--no-project-context  Skip auto-including AGENTS.md/CLAUDE.md from the project
+--html [ID]         Open the HTML report for a session (default: last)
+-m, --model ID      Model to use (see Models section below)
+-q, --quiet         Suppress progress output (spinners, status messages)
+-v, --verbose       Show each sub-agent's output before the summary
+-h, --help          Show this help message
+--version           Show version number
 ```
 
-### Agents
+### Models
 
-- **Bug Hunter** - Finds logic bugs, edge cases, null risks, race conditions
-- **Test Reviewer** - Checks test coverage and quality
-- **Impact Analyzer** - Traces cross-file dependencies and breaking changes
-- **Code Quality** - Reviews style, conventions, error handling
+The model is selected in this order of priority:
+
+1. `-m`/`--model` flag
+2. `PR_REVIEW_MODEL` environment variable
+3. `claude-sonnet-4-20250514` (if `ANTHROPIC_API_KEY` is set)
+4. First available model from configured API keys
+
+Model format: `provider/model-id` or just `model-id`.
+
+Examples: `anthropic/claude-sonnet-4-20250514`, `gpt-4o`, `bedrock/anthropic.claude-3-sonnet`
+
+Use `--list-models` to see all available models for your configured API keys.
+
+> **Note:** This tool does not read pi's default model setting.
 
 ### Continuing a Conversation
 
@@ -133,6 +144,35 @@ cat PR_DESCRIPTION.md | pr-review --context - main
 git log -1 --pretty=%B | pr-review --context - main
 ```
 
+### HTML Reports
+
+Each review generates an HTML report with the full diff, individual agent reports, and the summary. After a review completes, you'll see a hint with the session ID:
+
+```bash
+# Open the most recent report
+pr-review --html
+
+# Open a specific report by session ID
+pr-review --html <session-id>
+```
+
+Reports are saved under `~/.cache/pr-review/<session-id>/`.
+
+### Colorized Output
+
+Output is colorized by default when stdout is a TTY. pr-review pipes markdown through [mdriver](https://github.com/badlogic/mdriver) or [bat](https://github.com/sharkdp/bat) if either is available.
+
+```bash
+# Force color on (e.g., when piping)
+pr-review --color always main | less -R
+
+# Disable color
+pr-review --color never main
+
+# Respects NO_COLOR environment variable
+NO_COLOR=1 pr-review main
+```
+
 ## How It Works
 
 1. Runs `git diff` with your arguments
@@ -141,6 +181,7 @@ git log -1 --pretty=%B | pr-review --context - main
 4. Each agent can read files in your repo for additional context
 5. A summarizer synthesizes all reports into a prioritized review
 6. Session is saved for follow-up questions with `-c`
+7. An HTML report is generated for browsing with `--html`
 
 ### Project Context
 
@@ -149,6 +190,20 @@ pr-review automatically discovers and includes `AGENTS.md` or `CLAUDE.md` from y
 - Files are discovered using the same logic as [pi](https://github.com/badlogic/pi-mono): checks for `AGENTS.md` then `CLAUDE.md` in each directory from the working directory up to the root
 - Files larger than 8KB are truncated with a warning
 - Use `--no-project-context` to disable this behavior
+
+### Token Usage
+
+After each review, pr-review displays a summary of token usage, cost, cache hit rate, and elapsed time. Use `-q` to suppress this output.
+
+## Files
+
+```
+~/.cache/pr-review/                         Session history directory
+~/.cache/pr-review/<session-id>/session.jsonl  Session data (for --continue)
+~/.cache/pr-review/<session-id>/reports.json   Agent reports and metadata
+~/.cache/pr-review/<session-id>/review.html    HTML report (for --html)
+~/.cache/pr-review/last                      Symlink to most recent session
+```
 
 ## Development
 
