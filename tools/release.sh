@@ -37,7 +37,6 @@ fi
 # Update version in package.json
 sed -i.bak "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW_VERSION\"/" package.json
 rm package.json.bak
-npm install
 
 # Run checks before committing
 echo "Running biome check..."
