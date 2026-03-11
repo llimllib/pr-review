@@ -87,21 +87,21 @@ pr-review main -- ':!package-lock.json'
 ### Options
 
 ```
--a, --agents NAMES  Comma-separated list of agents to run (default: all)
-                    Available: bug, test, impact, quality
--c, --continue MSG  Continue chatting about the last review
---color WHEN        When to colorize output: auto, always, never (default: auto)
-                    Uses mdriver or bat if available. Respects NO_COLOR env var.
---context TEXT      Additional context for the review
---context -         Read additional context from stdin
---list-models       List available models and exit
---no-project-context  Skip auto-including AGENTS.md/CLAUDE.md from the project
---html [ID]         Open the HTML report for a session (default: last)
--m, --model ID      Model to use (see Models section below)
--q, --quiet         Suppress progress output (spinners, status messages)
--v, --verbose       Show each sub-agent's output before the summary
--h, --help          Show this help message
---version           Show version number
+-a, --agents NAMES   Comma-separated list of agents to run (default: all)
+                     Available: bug, test, impact, quality
+-c, --continue MSG   Continue chatting about the last review
+--color WHEN         When to colorize output: auto, always, never (default: auto)
+                     Uses mdriver or bat if available. Respects NO_COLOR env var.
+--context TEXT       Additional context for the review
+--context -          Read additional context from stdin
+--list-models        List available models and exit
+--no-project-context Skip auto-including AGENTS.md/CLAUDE.md from the project
+--html [ID]          Open the HTML report for a session (default: last)
+-m, --model ID       Model to use (see Models section below)
+-q, --quiet          Suppress progress output (spinners, status messages)
+-v, --verbose        Show each sub-agent's output before the summary
+-h, --help           Show this help message
+--version            Show version number
 ```
 
 ### Models
