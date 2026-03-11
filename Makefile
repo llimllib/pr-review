@@ -15,7 +15,7 @@ lint-fix:
 	npx biome check --write src/
 
 clean:
-	rm -rf build pr-review dist
+	rm -rf build pr-review dist *.bun-build
 
 release:
 	./tools/release.sh
