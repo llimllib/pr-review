@@ -460,7 +460,7 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 
 	const spinner = createSpinner("Loading previous session...", quiet);
 
-	const authStorage = new AuthStorage();
+	const authStorage = AuthStorage.create();
 	const modelRegistry = new ModelRegistry(authStorage);
 	const model = await resolveModel(authStorage, modelRegistry, modelId);
 
@@ -577,7 +577,7 @@ function helper() {
 
 	const spinner = createSpinner("Initializing...", quiet || verbose);
 
-	const authStorage = new AuthStorage();
+	const authStorage = AuthStorage.create();
 	const modelRegistry = new ModelRegistry(authStorage);
 	const model = await resolveModel(authStorage, modelRegistry, modelId);
 
