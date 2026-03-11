@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import pkg from "../package.json";
 import { ALL_AGENT_NAMES } from "./agents.ts";
+import { listModels } from "./list-models.ts";
 import type { ColorMode } from "./output.ts";
 import { continueReview, openHtmlReport, runReview } from "./review.ts";
 
@@ -18,6 +19,7 @@ Options:
                       Uses mdriver or bat if available. Respects NO_COLOR env var.
   --context TEXT      Additional context for the review
   --context -         Read additional context from stdin
+  --list-models       List available models and exit
   --no-project-context  Skip auto-including AGENTS.md/CLAUDE.md from the project
   --html [ID]         Open the HTML report for a session (default: last)
   -m, --model ID      Model to use (see Models section below)
@@ -68,6 +70,7 @@ let hasUnifiedContext = false;
 let continueMessage: string | undefined;
 let colorMode: ColorMode = "auto";
 let htmlSessionId: string | undefined;
+let listModelsFlag = false;
 let noProjectContext = false;
 
 const args = process.argv.slice(2);
@@ -82,6 +85,10 @@ while (i < args.length) {
 		case "--version":
 			console.log(pkg.version);
 			process.exit(0);
+			break;
+		case "--list-models":
+			listModelsFlag = true;
+			i++;
 			break;
 		case "-v":
 		case "--verbose":
@@ -222,8 +229,20 @@ while (i < args.length) {
 
 const cwd = process.cwd();
 
-// Handle HTML report mode
-if (htmlSessionId) {
+// Handle --list-models
+if (listModelsFlag) {
+	listModels()
+		.then(() => {
+			process.exit(0);
+		})
+		.catch((err) => {
+			console.error(
+				`\x1b[31m❌ ${err instanceof Error ? err.message : String(err)}\x1b[0m`,
+			);
+			process.exit(1);
+		});
+} else if (htmlSessionId) {
+	// Handle HTML report mode
 	try {
 		openHtmlReport(htmlSessionId);
 	} catch (err) {
