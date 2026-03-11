@@ -3,7 +3,7 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Api, Model } from "@mariozechner/pi-ai";
+import type { Api, Model, Usage } from "@mariozechner/pi-ai";
 import { getModel } from "@mariozechner/pi-ai";
 import type { ResourceLoader } from "@mariozechner/pi-coding-agent";
 import {
@@ -37,6 +37,79 @@ function debug(msg: string): void {
 	if (DEBUG) {
 		process.stderr.write(`[DEBUG review] ${msg}\n`);
 	}
+}
+
+// Token usage tracking
+interface TokenUsage {
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
+	cost: number;
+}
+
+function emptyTokenUsage(): TokenUsage {
+	return {
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
+		cost: 0,
+	};
+}
+
+function addUsage(totals: TokenUsage, usage: Usage): void {
+	totals.inputTokens += usage.input;
+	totals.outputTokens += usage.output;
+	totals.cacheReadTokens += usage.cacheRead;
+	totals.cacheWriteTokens += usage.cacheWrite;
+	totals.cost += usage.cost.total;
+}
+
+function mergeUsage(totals: TokenUsage, other: TokenUsage): void {
+	totals.inputTokens += other.inputTokens;
+	totals.outputTokens += other.outputTokens;
+	totals.cacheReadTokens += other.cacheReadTokens;
+	totals.cacheWriteTokens += other.cacheWriteTokens;
+	totals.cost += other.cost;
+}
+
+function formatTokenUsage(usage: TokenUsage): string {
+	// "input" from the API means non-cached input tokens only.
+	// Total input = input + cacheRead + cacheWrite.
+	const totalInput =
+		usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
+
+	const parts = [
+		`${formatNumber(totalInput)} in`,
+		`${formatNumber(usage.outputTokens)} out`,
+	];
+
+	// Show cache breakdown when caching was used
+	if (usage.cacheReadTokens > 0 || usage.cacheWriteTokens > 0) {
+		const cacheHitPct =
+			totalInput > 0
+				? Math.round((usage.cacheReadTokens / totalInput) * 100)
+				: 0;
+		parts.push(`${cacheHitPct}% cached`);
+	}
+
+	const costStr =
+		usage.cost >= 0.01
+			? `$${usage.cost.toFixed(2)}`
+			: `$${usage.cost.toFixed(4)}`;
+
+	return `Tokens: ${parts.join(", ")} · Cost: ${costStr}`;
+}
+
+function formatNumber(n: number): string {
+	if (n >= 1_000_000) {
+		return `${(n / 1_000_000).toFixed(1)}M`;
+	}
+	if (n >= 1_000) {
+		return `${(n / 1_000).toFixed(1)}k`;
+	}
+	return String(n);
 }
 
 // Session storage
@@ -213,7 +286,7 @@ async function runSubAgent(
 	additionalContext: string,
 	contextFiles: ContextFile[],
 	onOutput?: AgentOutputCallback,
-): Promise<string> {
+): Promise<{ report: string; usage: TokenUsage }> {
 	const { session } = await createAgentSession({
 		cwd,
 		model,
@@ -230,6 +303,7 @@ async function runSubAgent(
 	});
 
 	let result = "";
+	const usage = emptyTokenUsage();
 	const unsubscribe = session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
@@ -246,6 +320,12 @@ async function runSubAgent(
 				toolName: event.toolName,
 				args: event.args,
 			});
+		} else if (
+			event.type === "message_end" &&
+			"role" in event.message &&
+			event.message.role === "assistant"
+		) {
+			addUsage(usage, event.message.usage);
 		}
 	});
 
@@ -259,7 +339,7 @@ async function runSubAgent(
 	unsubscribe();
 	session.dispose();
 
-	return result;
+	return { report: result, usage };
 }
 
 async function runSummarizer(
@@ -273,7 +353,7 @@ async function runSummarizer(
 	sessionId: string,
 	contextFiles: ContextFile[],
 	spinner?: Spinner,
-): Promise<string> {
+): Promise<{ summary: string; usage: TokenUsage }> {
 	const sessionDir = getSessionDir(sessionId);
 	// Ensure session directory exists
 	fs.mkdirSync(sessionDir, { recursive: true });
@@ -300,6 +380,7 @@ async function runSummarizer(
 
 	let firstChunk = true;
 	let summaryText = "";
+	const usage = emptyTokenUsage();
 	const unsubscribe = session.subscribe((event) => {
 		if (
 			event.type === "message_update" &&
@@ -311,6 +392,12 @@ async function runSummarizer(
 			}
 			summaryText += event.assistantMessageEvent.delta;
 			outputWriter.write(event.assistantMessageEvent.delta);
+		} else if (
+			event.type === "message_end" &&
+			"role" in event.message &&
+			event.message.role === "assistant"
+		) {
+			addUsage(usage, event.message.usage);
 		}
 	});
 
@@ -336,7 +423,7 @@ async function runSummarizer(
 		fs.copyFileSync(originalFile, LEGACY_SESSION_FILE);
 	}
 	debug("runSummarizer: complete");
-	return summaryText;
+	return { summary: summaryText, usage };
 }
 
 export async function continueReview(options: ContinueOptions): Promise<void> {
@@ -527,13 +614,14 @@ function helper() {
 	spinner.update(`Running agents... (0/${total})`);
 
 	// Run sub-agents in parallel
+	const totalUsage = emptyTokenUsage();
 	const agentPromises = agentNames.map(async (name) => {
 		const agent = AGENTS[name];
 		if (!agent) throw new Error(`Unknown agent: ${name}`);
 
 		const onOutput = renderer.createCallback(agent.name);
 
-		const report = await runSubAgent(
+		const { report, usage } = await runSubAgent(
 			agent,
 			diff,
 			cwd,
@@ -547,12 +635,15 @@ function helper() {
 
 		completed.push(name);
 
-		return [agent.name, report] as const;
+		return { name: agent.name, report, usage };
 	});
 
 	const results = await Promise.all(agentPromises);
 	renderer.flush();
-	const reports = new Map(results);
+	const reports = new Map(results.map((r) => [r.name, r.report]));
+	for (const r of results) {
+		mergeUsage(totalUsage, r.usage);
+	}
 
 	spinner.succeed(`Agents complete (${total}/${total})`);
 
@@ -572,7 +663,7 @@ function helper() {
 	const modelLabel = `${model.provider}/${model.id}`;
 
 	// Run summarizer
-	const summaryText = await runSummarizer(
+	const { summary: summaryText, usage: summarizerUsage } = await runSummarizer(
 		diff,
 		reports,
 		cwd,
@@ -584,6 +675,7 @@ function helper() {
 		contextFiles,
 		summarizerSpinner,
 	);
+	mergeUsage(totalUsage, summarizerUsage);
 	debug("runReview: runSummarizer complete, calling outputWriter.end()");
 	await outputWriter.end();
 	debug("runReview: outputWriter.end() complete");
@@ -614,6 +706,11 @@ function helper() {
 	process.stderr.write(
 		`\x1b[34mView full report: pr-review --html ${sessionId}\x1b[0m\n`,
 	);
+
+	// Print token usage summary
+	if (!quiet) {
+		process.stderr.write(`\x1b[2m${formatTokenUsage(totalUsage)}\x1b[0m\n`);
+	}
 
 	debug("runReview: complete");
 }

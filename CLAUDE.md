@@ -53,6 +53,8 @@ bun build --compile ...       # Creates ./pr-review binary
 - `@mariozechner/pi-ai` - Model definitions and types
 - `@mariozechner/pi-coding-agent` - Agent sessions, tools, session management
 
+Run `bun install` when any depedency changes are made to make sure you update the bun.lock lockfile
+
 ## Key Patterns
 
 ### Agent Sessions

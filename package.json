@@ -6,8 +6,8 @@
     "pr-review": "./bin/pr-review"
   },
   "dependencies": {
-    "@mariozechner/pi-ai": "*",
-    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "^0.57.1",
+    "@mariozechner/pi-coding-agent": "^0.57.1",
     "marked": "^17.0.4"
   },
   "devDependencies": {
