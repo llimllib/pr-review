@@ -74,7 +74,17 @@ function mergeUsage(totals: TokenUsage, other: TokenUsage): void {
 	totals.cost += other.cost;
 }
 
-function formatTokenUsage(usage: TokenUsage): string {
+function formatElapsed(ms: number): string {
+	const totalSeconds = Math.round(ms / 1000);
+	const minutes = Math.floor(totalSeconds / 60);
+	const seconds = totalSeconds % 60;
+	if (minutes > 0) {
+		return `${minutes}m${String(seconds).padStart(2, "0")}s`;
+	}
+	return `${seconds}s`;
+}
+
+function formatTokenUsage(usage: TokenUsage, elapsedMs?: number): string {
 	// "input" from the API means non-cached input tokens only.
 	// Total input = input + cacheRead + cacheWrite.
 	const totalInput =
@@ -99,7 +109,11 @@ function formatTokenUsage(usage: TokenUsage): string {
 			? `$${usage.cost.toFixed(2)}`
 			: `$${usage.cost.toFixed(4)}`;
 
-	return `Tokens: ${parts.join(", ")} · Cost: ${costStr}`;
+	let result = `Tokens: ${parts.join(", ")} · Cost: ${costStr}`;
+	if (elapsedMs !== undefined) {
+		result += ` · Elapsed: ${formatElapsed(elapsedMs)}`;
+	}
+	return result;
 }
 
 function formatNumber(n: number): string {
@@ -512,6 +526,7 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
 }
 
 export async function runReview(options: ReviewOptions): Promise<void> {
+	const startTime = Date.now();
 	const {
 		diff,
 		cwd,
@@ -709,7 +724,10 @@ function helper() {
 
 	// Print token usage summary
 	if (!quiet) {
-		process.stderr.write(`\x1b[2m${formatTokenUsage(totalUsage)}\x1b[0m\n`);
+		const elapsedMs = Date.now() - startTime;
+		process.stderr.write(
+			`\x1b[2m${formatTokenUsage(totalUsage, elapsedMs)}\x1b[0m\n`,
+		);
 	}
 
 	debug("runReview: complete");
