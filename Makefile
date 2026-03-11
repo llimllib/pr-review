@@ -2,10 +2,14 @@
 
 SOURCES := $(wildcard src/*.ts)
 
-pr-review: build/cli.js
+pr-review: node_modules/.stamp build/cli.js
 	bun build --compile --outfile=pr-review build/cli.js
 
-build/cli.js: $(SOURCES) build.ts
+node_modules/.stamp: package.json bun.lock
+	bun install
+	touch node_modules/.stamp
+
+build/cli.js: $(SOURCES) build.ts node_modules/.stamp
 	bun run build.ts
 
 lint:
