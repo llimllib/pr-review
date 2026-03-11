@@ -8,7 +8,7 @@ const SPINNER_INTERVAL = 80;
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
 /** Strip ANSI escape codes and return the visible character count. */
-function visibleLength(s: string): number {
+export function visibleLength(s: string): number {
 	return s.replace(ANSI_RE, "").length;
 }
 
@@ -18,7 +18,7 @@ function visibleLength(s: string): number {
  * preserved so colours stay correct; a trailing "…" replaces the last visible
  * character when truncation is needed.
  */
-function truncateToVisible(s: string, maxVisible: number): string {
+export function truncateToVisible(s: string, maxVisible: number): string {
 	if (maxVisible <= 0) return "";
 	if (visibleLength(s) <= maxVisible) return s;
 
