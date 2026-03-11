@@ -3,6 +3,43 @@
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const SPINNER_INTERVAL = 80;
 
+// Regex to match ANSI escape sequences (colors, cursor movement, etc.)
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escapes requires \x1b
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
+
+/** Strip ANSI escape codes and return the visible character count. */
+export function visibleLength(s: string): number {
+	return s.replace(ANSI_RE, "").length;
+}
+
+/**
+ * Truncate text so that its visible length (ignoring ANSI codes) fits within
+ * maxVisible characters. ANSI sequences that fall before the cut-off are
+ * preserved so colours stay correct; a trailing "…" replaces the last visible
+ * character when truncation is needed.
+ */
+export function truncateToVisible(s: string, maxVisible: number): string {
+	if (maxVisible <= 0) return "";
+	if (visibleLength(s) <= maxVisible) return s;
+
+	let visible = 0;
+	let i = 0;
+	// Walk the string, skipping ANSI codes when counting visible chars.
+	// We stop one short of maxVisible to leave room for the "…" indicator.
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escapes requires \x1b
+	const ansiPattern = /^\x1b\[[0-9;]*m/;
+	while (i < s.length && visible < maxVisible - 1) {
+		const ansiMatch = s.slice(i).match(ansiPattern);
+		if (ansiMatch) {
+			i += ansiMatch[0].length;
+		} else {
+			i++;
+			visible++;
+		}
+	}
+	return `${s.slice(0, i)}…\x1b[0m`;
+}
+
 export interface Spinner {
 	update(text: string): void;
 	succeed(text?: string): void;
@@ -27,7 +64,13 @@ export function createSpinner(initialText: string, quiet = false): Spinner {
 
 	const render = () => {
 		const frame = SPINNER_FRAMES[frameIndex];
-		process.stderr.write(`\r\x1b[K\x1b[36m${frame}\x1b[0m ${text}`);
+		// The prefix is "⠋ " (spinner frame + space) = 2 visible columns.
+		// Truncate text so the full line never exceeds terminal width,
+		// preventing wrap which would leave ghost lines on screen.
+		const cols = process.stderr.columns || 80;
+		const prefixLen = 2; // frame char + space
+		const truncated = truncateToVisible(text, cols - prefixLen);
+		process.stderr.write(`\r\x1b[K\x1b[36m${frame}\x1b[0m ${truncated}`);
 		frameIndex = (frameIndex + 1) % SPINNER_FRAMES.length;
 	};
 
