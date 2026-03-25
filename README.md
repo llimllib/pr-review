@@ -2,16 +2,6 @@
 
 A CLI tool based on [pi](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) that uses multiple specialized AI agents to review code changes. Each agent focuses on a different aspect of the review, then a summarizer synthesizes their findings into a single coherent report.
 
-## Installation
-
-### Homebrew (macOS/Linux)
-
-```bash
-brew install llimllib/tap/pr-review
-```
-
-You can download a binary from [releases](https://github.com/llimllib/pr-review/releases) if you don't want to use homebrew
-
 ## Preview
 
 [![asciicast](https://asciinema.org/a/eTy78CUSTWQe7NZO.svg)](https://asciinema.org/a/eTy78CUSTWQe7NZO)
@@ -28,6 +18,17 @@ The four sub-agents are:
 Once the agents have reported their results, they're synthesized by the [summarizer](https://github.com/llimllib/pr-review/blob/main/src/agents.ts)
 
 This setup is heavily inspired by [anthropic's pr-review-toolkit](https://github.com/anthropics/claude-code/tree/main/plugins/pr-review-toolkit)
+
+## Installation
+
+### Homebrew (macOS/Linux)
+
+```bash
+brew install llimllib/tap/pr-review
+```
+
+You can download a binary from [releases](https://github.com/llimllib/pr-review/releases) if you don't want to use homebrew
+
 
 ### Download Binary
 
