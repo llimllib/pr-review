@@ -88,11 +88,15 @@ cat > _site/index.html << HTMLEOF
     }
     .top-nav {
       background: #f8f9fa;
-      padding: 0.75rem 2rem;
       border-bottom: 1px solid #e1e4e8;
       position: sticky;
       top: 0;
       z-index: 100;
+    }
+    .top-nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0.75rem 0 0.75rem 1.5rem;
     }
     .top-nav a {
       margin-right: 1rem;
@@ -200,14 +204,20 @@ cat > _site/index.html << HTMLEOF
       .main-content {
         padding: 1rem;
       }
+      .top-nav-inner {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
     }
   </style>
 </head>
 <body>
   <nav class="top-nav">
-    <a href="/">Home</a>
-    <a href="./transcripts/">Transcripts</a>
-    <a href="https://github.com/llimllib/pr-review">${GITHUB_ICON}GitHub</a>
+    <div class="top-nav-inner">
+      <a href="/">Home</a>
+      <a href="./transcripts/">Transcripts</a>
+      <a href="https://github.com/llimllib/pr-review">${GITHUB_ICON}GitHub</a>
+    </div>
   </nav>
   <div class="page-layout">
     ${TOC_HTML}
