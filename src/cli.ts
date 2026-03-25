@@ -5,6 +5,12 @@ import { listModels } from "./list-models.ts";
 import type { ColorMode } from "./output.ts";
 import { continueReview, openHtmlReport, runReview } from "./review.ts";
 
+// Fix for Bun binary build: esbuild can't bundle dynamic imports, so we
+// import the Bedrock provider statically and override the module loader
+import { bedrockProviderModule } from "@mariozechner/pi-ai/bedrock-provider";
+import { setBedrockProviderModule } from "@mariozechner/pi-ai";
+setBedrockProviderModule(bedrockProviderModule);
+
 function usage(exitCode: number = 0): never {
 	console.log(`pr-review [options] [git-diff-arguments...]
 
