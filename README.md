@@ -46,9 +46,7 @@ Requires [Bun](https://bun.sh):
 ```bash
 git clone https://github.com/llimllib/pr-review
 cd pr-review
-bun install
-bun run build.ts
-bun build --compile --outfile=pr-review build/cli.js
+make
 ```
 
 ## Setup
