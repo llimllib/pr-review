@@ -3,3 +3,4 @@ pr-review
 build/
 dist/
 *.bun-build
+_site/

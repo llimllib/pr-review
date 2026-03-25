@@ -12,6 +12,10 @@ brew install llimllib/tap/pr-review
 
 You can download a binary from [releases](https://github.com/llimllib/pr-review/releases) if you don't want to use homebrew
 
+## Preview
+
+[![asciicast](https://asciinema.org/a/eTy78CUSTWQe7NZO.svg)](https://asciinema.org/a/eTy78CUSTWQe7NZO)
+
 ## The agents
 
 The four sub-agents are:
