@@ -10,7 +10,6 @@ import {
 	AuthStorage,
 	createAgentSession,
 	createExtensionRuntime,
-	createReadOnlyTools,
 	ModelRegistry,
 	SessionManager,
 	SettingsManager,
@@ -29,6 +28,7 @@ import { generateHtml } from "./html.ts";
 import type { ColorMode, OutputWriter } from "./output.ts";
 import { createOutputWriter } from "./output.ts";
 import { createSpinner, type Spinner } from "./spinner.ts";
+import { createSandboxedReadOnlyTools } from "./tools.ts";
 
 const DEBUG = process.env.PR_REVIEW_DEBUG === "1";
 const TEST_MODE = process.env.PR_REVIEW_TEST === "1";
@@ -308,7 +308,7 @@ async function runSubAgent(
 		authStorage,
 		modelRegistry,
 		resourceLoader: makeResourceLoader(agent.systemPrompt, contextFiles),
-		tools: createReadOnlyTools(cwd),
+		tools: createSandboxedReadOnlyTools(cwd),
 		sessionManager: SessionManager.inMemory(),
 		settingsManager: SettingsManager.inMemory({
 			compaction: { enabled: false },
