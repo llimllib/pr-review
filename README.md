@@ -211,6 +211,7 @@ After each review, pr-review displays a summary of token usage, cost, cache hit 
 ### What the agents cannot do
 
 - **Access files outside the project directory** — all path arguments are validated to resolve within the working directory. Paths using `../`, `~`, or absolute paths outside the project are rejected. (Note: symlinks within the project that point outside are not resolved; see [Limitations](#limitations) below.)
+    - if you find a way around this, please file an issue
 - **Execute commands** — there is no `bash` tool
 - **Write or modify files** — there is no `edit` or `write` tool
 - **Make network requests** — there is no way to `curl`, `fetch`, or otherwise contact external servers
