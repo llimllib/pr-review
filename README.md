@@ -85,7 +85,24 @@ pr-review main -- src/
 
 # Exclude files (e.g., lock files)
 pr-review main -- ':!package-lock.json'
+
+# Review a GitHub PR (requires gh CLI)
+pr-review https://github.com/owner/repo/pull/123
+pr-review https://github.com/owner/repo/pull/123/files
+pr-review owner/repo#123
 ```
+
+### GitHub PR Support
+
+To review a GitHub pull request, provide a PR URL or short reference. This requires the [GitHub CLI (`gh`)](https://cli.github.com) to be installed.
+
+**Public repos** work without authentication. **Private repos** require authentication:
+
+```bash
+gh auth login
+```
+
+When reviewing a PR, the tool fetches the diff and includes the PR title, description, and branch information as context for the agents.
 
 ### Options
 

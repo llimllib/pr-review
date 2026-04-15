@@ -17,6 +17,7 @@ src/
 ├── cli.ts      # Argument parsing, main entry point
 ├── agents.ts   # Agent definitions and system prompts
 ├── context.ts  # Project context file discovery and truncation
+├── github.ts   # GitHub PR URL parsing and fetching via gh CLI
 ├── review.ts   # Core review logic, session management
 └── spinner.ts  # CLI spinner for progress feedback
 ```
@@ -33,6 +34,8 @@ src/
   5. `continueReview()` loads previous session for follow-up questions
 
 - **Project context** (`context.ts`): Discovers `AGENTS.md`/`CLAUDE.md` from the project directory (and ancestors) using pi's `DefaultResourceLoader`. Files over 8KB are truncated with a warning. Use `--no-project-context` to skip.
+
+- **GitHub PR support** (`github.ts`): Parses GitHub PR URLs (full URLs or `owner/repo#123` format) and fetches PR metadata and diffs using the GitHub CLI (`gh`). PR description is included as additional context for agents. Requires `gh` to be installed and authenticated for private repos.
 
 - **Session persistence**: Sessions are saved to `~/.cache/pr-review/last-session.jsonl` using pi's `SessionManager`. This enables the `-c/--continue` feature.
 
@@ -92,6 +95,10 @@ spinner.stop();  // Clear without message
 ```bash
 # Quick test with one agent
 ./pr-review -a quality HEAD~1
+
+# Test with GitHub PR URL
+./pr-review https://github.com/owner/repo/pull/123
+./pr-review owner/repo#123
 
 # Test continuation
 ./pr-review -c "summarize in one sentence"
