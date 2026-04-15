@@ -3,6 +3,12 @@ import { setBedrockProviderModule } from "@mariozechner/pi-ai";
 import { bedrockProviderModule } from "@mariozechner/pi-ai/bedrock-provider";
 import pkg from "../package.json";
 import { ALL_AGENT_NAMES } from "./agents.ts";
+import {
+	fetchPRDiff,
+	fetchPRMetadata,
+	formatPRContext,
+	parseGitHubPR,
+} from "./github.ts";
 import { listModels } from "./list-models.ts";
 import type { ColorMode } from "./output.ts";
 import { continueReview, openHtmlReport, runReview } from "./review.ts";
@@ -12,10 +18,11 @@ import { continueReview, openHtmlReport, runReview } from "./review.ts";
 setBedrockProviderModule(bedrockProviderModule);
 
 function usage(exitCode: number = 0): never {
-	console.log(`pr-review [options] [git-diff-arguments...]
+	console.log(`pr-review [options] [git-diff-arguments | github-pr-url]
 
-Ask specialized AI agents to review code changes. Arguments are passed
-directly to 'git diff', so any git diff syntax works.
+Ask specialized AI agents to review code changes. Provide either:
+  • Git diff arguments (passed to 'git diff')
+  • GitHub PR URL (fetched via 'gh' CLI)
 
 Options:
   -a, --agents NAMES   Comma-separated list of agents to run (default: all)
@@ -35,12 +42,20 @@ Options:
   --version            Show version number
 
 Examples:
+  # Git diff syntax
   pr-review main
   pr-review --cached
   pr-review main...feature-branch -- src/
   pr-review --agents bug,test main
+  
+  # GitHub PR URLs
+  pr-review https://github.com/owner/repo/pull/123
+  pr-review https://github.com/owner/repo/pull/123/files
+  pr-review owner/repo#123
+  
+  # With options
   pr-review --context "Focus on auth security" main
-  pr-review --verbose main
+  pr-review --verbose https://github.com/owner/repo/pull/123
   
   # Continue chatting about the last review
   pr-review -c "What about edge cases in the auth flow?"
@@ -275,28 +290,69 @@ if (listModelsFlag) {
 			process.exit(1);
 		});
 } else {
-	// Add default unified context if not specified
-	if (!hasUnifiedContext) {
-		gitArgs.unshift(`-U${contextValue}`);
-	}
+	// Check if first argument is a GitHub PR URL
+	const firstArg = gitArgs[0];
+	const prRef = firstArg ? parseGitHubPR(firstArg) : null;
 
-	// Run git diff
 	let diff: string;
-	try {
-		diff = execSync(`git diff ${gitArgs.map((a) => `'${a}'`).join(" ")}`, {
-			encoding: "utf-8",
-			maxBuffer: 10 * 1024 * 1024,
-		}).trim();
-	} catch (err) {
-		console.error(
-			`git diff failed: ${err instanceof Error ? err.message : String(err)}`,
-		);
-		process.exit(1);
-	}
+	if (prRef) {
+		// GitHub PR mode
+		if (gitArgs.length > 1) {
+			console.error(
+				"Cannot mix PR URL with git diff arguments. Use the PR URL alone or git diff syntax.",
+			);
+			process.exit(1);
+		}
 
-	if (!diff) {
-		console.error("No changes found to review.");
-		process.exit(1);
+		try {
+			// Fetch PR metadata for context
+			const pr = fetchPRMetadata(prRef);
+			const prContext = formatPRContext(pr);
+
+			// Prepend PR context to any additional context
+			if (additionalContext) {
+				additionalContext = `${prContext}\n\n---\n\n${additionalContext}`;
+			} else {
+				additionalContext = prContext;
+			}
+
+			// Fetch PR diff
+			diff = fetchPRDiff(prRef);
+
+			if (!diff) {
+				console.error(`No changes found in PR #${prRef.number}.`);
+				process.exit(1);
+			}
+		} catch (err) {
+			console.error(
+				`\x1b[31m❌ ${err instanceof Error ? err.message : String(err)}\x1b[0m`,
+			);
+			process.exit(1);
+		}
+	} else {
+		// Git diff mode
+		// Add default unified context if not specified
+		if (!hasUnifiedContext) {
+			gitArgs.unshift(`-U${contextValue}`);
+		}
+
+		// Run git diff
+		try {
+			diff = execSync(`git diff ${gitArgs.map((a) => `'${a}'`).join(" ")}`, {
+				encoding: "utf-8",
+				maxBuffer: 10 * 1024 * 1024,
+			}).trim();
+		} catch (err) {
+			console.error(
+				`git diff failed: ${err instanceof Error ? err.message : String(err)}`,
+			);
+			process.exit(1);
+		}
+
+		if (!diff) {
+			console.error("No changes found to review.");
+			process.exit(1);
+		}
 	}
 
 	// Estimate tokens and warn if large
