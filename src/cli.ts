@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { setBedrockProviderModule } from "@mariozechner/pi-ai";
 import { bedrockProviderModule } from "@mariozechner/pi-ai/bedrock-provider";
 import pkg from "../package.json";
@@ -355,12 +355,12 @@ if (listModelsFlag) {
 
     // Convert exclude patterns to git pathspecs
     for (const pattern of excludePatterns) {
-      gitArgs.push(`':!${pattern}'`);
+      gitArgs.push(`:!${pattern}`);
     }
 
     // Run git diff
     try {
-      diff = execSync(`git diff ${gitArgs.map((a) => `'${a}'`).join(" ")}`, {
+      diff = execFileSync("git", ["diff", ...gitArgs], {
         encoding: "utf-8",
         maxBuffer: 10 * 1024 * 1024,
       }).trim();

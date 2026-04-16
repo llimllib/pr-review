@@ -113,6 +113,17 @@ export function fetchPRMetadata(ref: GitHubPRReference): PullRequest {
 }
 
 /**
+ * Build exclude arguments for gh pr diff command.
+ * @param patterns - Glob patterns to exclude
+ * @returns Formatted exclude arguments string for gh pr diff
+ */
+export function buildExcludeArgs(patterns: string[]): string {
+  return patterns.length > 0
+    ? ` ${patterns.map((p) => `-e ${JSON.stringify(p)}`).join(" ")}`
+    : "";
+}
+
+/**
  * Fetch PR diff using the GitHub CLI.
  * @param excludePatterns - Glob patterns to exclude from the diff (passed to gh pr diff -e)
  */
@@ -121,10 +132,7 @@ export function fetchPRDiff(
   excludePatterns: string[] = [],
 ): string {
   const repoArg = `${ref.owner}/${ref.repo}`;
-  const excludeArgs =
-    excludePatterns.length > 0
-      ? ` ${excludePatterns.map((p) => `-e '${p}'`).join(" ")}`
-      : "";
+  const excludeArgs = buildExcludeArgs(excludePatterns);
 
   let diff: string;
   try {
