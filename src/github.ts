@@ -114,17 +114,28 @@ export function fetchPRMetadata(ref: GitHubPRReference): PullRequest {
 
 /**
  * Fetch PR diff using the GitHub CLI.
+ * @param excludePatterns - Glob patterns to exclude from the diff (passed to gh pr diff -e)
  */
-export function fetchPRDiff(ref: GitHubPRReference): string {
+export function fetchPRDiff(
+	ref: GitHubPRReference,
+	excludePatterns: string[] = [],
+): string {
 	const repoArg = `${ref.owner}/${ref.repo}`;
+	const excludeArgs =
+		excludePatterns.length > 0
+			? ` ${excludePatterns.map((p) => `-e '${p}'`).join(" ")}`
+			: "";
 
 	let diff: string;
 	try {
-		diff = execSync(`gh pr diff ${ref.number} --repo ${repoArg}`, {
-			encoding: "utf-8",
-			maxBuffer: 10 * 1024 * 1024,
-			stdio: ["ignore", "pipe", "pipe"],
-		});
+		diff = execSync(
+			`gh pr diff ${ref.number} --repo ${repoArg}${excludeArgs}`,
+			{
+				encoding: "utf-8",
+				maxBuffer: 10 * 1024 * 1024,
+				stdio: ["ignore", "pipe", "pipe"],
+			},
+		);
 	} catch (err) {
 		const execErr = err as ExecError;
 		if (execErr.status === 127) {

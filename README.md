@@ -83,8 +83,9 @@ pr-review main...feature-branch
 # Review only certain files
 pr-review main -- src/
 
-# Exclude files (e.g., lock files)
-pr-review main -- ':!package-lock.json'
+# Exclude files
+pr-review --exclude 'package-lock.json' --exclude '*.lock' main
+pr-review --exclude 'transcripts/*' owner/repo#123
 
 # Review a GitHub PR (requires gh CLI)
 pr-review https://github.com/owner/repo/pull/123
@@ -107,21 +108,22 @@ When reviewing a PR, the tool fetches the diff and includes the PR title, descri
 ### Options
 
 ```
--a, --agents NAMES   Comma-separated list of agents to run (default: all)
-                     Available: bug, test, impact, quality
--c, --continue MSG   Continue chatting about the last review
---color WHEN         When to colorize output: auto, always, never (default: auto)
-                     Uses mdriver or bat if available. Respects NO_COLOR env var.
---context TEXT       Additional context for the review
---context -          Read additional context from stdin
---list-models        List available models and exit
---no-project-context Skip auto-including AGENTS.md/CLAUDE.md from the project
---html [ID]          Open the HTML report for a session (default: last)
--m, --model ID       Model to use (see Models section below)
--q, --quiet          Suppress progress output (spinners, status messages)
--v, --verbose        Show each sub-agent's output before the summary
--h, --help           Show this help message
---version            Show version number
+-a, --agents NAMES     Comma-separated list of agents to run (default: all)
+                       Available: bug, test, impact, quality
+-c, --continue MSG     Continue chatting about the last review
+--color WHEN           When to colorize output: auto, always, never (default: auto)
+                       Uses mdriver or bat if available. Respects NO_COLOR env var.
+--context TEXT         Additional context for the review
+--context -            Read additional context from stdin
+-e, --exclude PATTERN  Exclude files matching pattern (can be repeated)
+--list-models          List available models and exit
+--no-project-context   Skip auto-including AGENTS.md/CLAUDE.md from the project
+--html [ID]            Open the HTML report for a session (default: last)
+-m, --model ID         Model to use (see Models section below)
+-q, --quiet            Suppress progress output (spinners, status messages)
+-v, --verbose          Show each sub-agent's output before the summary
+-h, --help             Show this help message
+--version              Show version number
 ```
 
 ### Models

@@ -25,21 +25,22 @@ Ask specialized AI agents to review code changes. Provide either:
   • GitHub PR URL (fetched via 'gh' CLI)
 
 Options:
-  -a, --agents NAMES   Comma-separated list of agents to run (default: all)
-                       Available: ${ALL_AGENT_NAMES.join(", ")}
-  -c, --continue MSG   Continue chatting about the last review
-  --color WHEN         When to colorize output: auto, always, never (default: auto)
-                       Uses mdriver or bat if available. Respects NO_COLOR env var.
-  --context TEXT       Additional context for the review
-  --context -          Read additional context from stdin
-  --list-models        List available models and exit
-  --no-project-context Skip auto-including AGENTS.md/CLAUDE.md from the project
-  --html [ID]          Open the HTML report for a session (default: last)
-  -m, --model ID       Model to use (see Models section below)
-  -q, --quiet          Suppress progress output (spinners, status messages)
-  -v, --verbose        Show each sub-agent's output before the summary
-  -h, --help           Show this help message
-  --version            Show version number
+  -a, --agents NAMES     Comma-separated list of agents to run (default: all)
+                         Available: ${ALL_AGENT_NAMES.join(", ")}
+  -c, --continue MSG     Continue chatting about the last review
+  --color WHEN           When to colorize output: auto, always, never (default:
+                         auto) Uses mdriver or bat if available.
+  --context TEXT         Additional context for the review
+  --context -            Read additional context from stdin
+  -e, --exclude PATTERN  Exclude files matching pattern (can be repeated)
+  --list-models          List available models and exit
+  --no-project-context   do not include AGENTS.md/CLAUDE.md from the project
+  --html [ID]            Open the HTML report for a session (default: last)
+  -m, --model ID         Model to use (see Models section below)
+  -q, --quiet            Suppress progress output (spinners, status messages)
+  -v, --verbose          Show each sub-agent's output before the summary
+  -h, --help             Show this help message
+  --version              Show version number
 
 Examples:
   # Git diff syntax
@@ -47,16 +48,20 @@ Examples:
   pr-review --cached
   pr-review main...feature-branch -- src/
   pr-review --agents bug,test main
-  
+
   # GitHub PR URLs
   pr-review https://github.com/owner/repo/pull/123
   pr-review https://github.com/owner/repo/pull/123/files
   pr-review owner/repo#123
-  
+
+  # Exclude files
+  pr-review --exclude 'package-lock.json' --exclude '*.lock' main
+  pr-review --exclude 'transcripts/*' owner/repo#123
+
   # With options
   pr-review --context "Focus on auth security" main
   pr-review --verbose https://github.com/owner/repo/pull/123
-  
+
   # Continue chatting about the last review
   pr-review -c "What about edge cases in the auth flow?"
   pr-review -c "Can you show me a code example for fix #2?"
@@ -76,6 +81,7 @@ Models:
   Examples: anthropic/claude-sonnet-4-20250514, gpt-4o, bedrock/anthropic.claude-3-sonnet
 
   Note: This tool does not read pi's default model setting.`);
+
 	process.exit(exitCode);
 }
 
@@ -93,6 +99,7 @@ let colorMode: ColorMode = "auto";
 let htmlSessionId: string | undefined;
 let listModelsFlag = false;
 let noProjectContext = false;
+const excludePatterns: string[] = [];
 
 const args = process.argv.slice(2);
 let i = 0;
@@ -210,6 +217,16 @@ while (i < args.length) {
 			}
 			i++;
 			break;
+		case "-e":
+		case "--exclude":
+			i++;
+			if (i >= args.length) {
+				console.error("Missing value for --exclude");
+				usage(1);
+			}
+			excludePatterns.push(args[i]);
+			i++;
+			break;
 		default:
 			// Check for --color=* patterns
 			if (arg.startsWith("--color=")) {
@@ -317,7 +334,7 @@ if (listModelsFlag) {
 			}
 
 			// Fetch PR diff
-			diff = fetchPRDiff(prRef);
+			diff = fetchPRDiff(prRef, excludePatterns);
 
 			if (!diff) {
 				console.error(`No changes found in PR #${prRef.number}.`);
@@ -334,6 +351,11 @@ if (listModelsFlag) {
 		// Add default unified context if not specified
 		if (!hasUnifiedContext) {
 			gitArgs.unshift(`-U${contextValue}`);
+		}
+
+		// Convert exclude patterns to git pathspecs
+		for (const pattern of excludePatterns) {
+			gitArgs.push(`':!${pattern}'`);
 		}
 
 		// Run git diff
