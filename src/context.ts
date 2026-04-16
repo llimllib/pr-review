@@ -5,13 +5,13 @@ import { DefaultResourceLoader } from "@mariozechner/pi-coding-agent";
 export const MAX_CONTEXT_FILE_BYTES = 8 * 1024; // 8 KB
 
 export interface ContextFile {
-	path: string;
-	content: string;
+  path: string;
+  content: string;
 }
 
 export interface ProcessedContext {
-	files: ContextFile[];
-	warnings: string[];
+  files: ContextFile[];
+  warnings: string[];
 }
 
 /**
@@ -20,30 +20,30 @@ export interface ProcessedContext {
  * The truncated output (including marker) will fit within maxBytes.
  */
 export function processContextFiles(
-	files: ContextFile[],
-	maxBytes: number = MAX_CONTEXT_FILE_BYTES,
+  files: ContextFile[],
+  maxBytes: number = MAX_CONTEXT_FILE_BYTES,
 ): ProcessedContext {
-	const warnings: string[] = [];
-	const processed = files.map(({ path: filePath, content }) => {
-		if (content.length > maxBytes) {
-			const marker = `\n\n[... truncated, file was ${(content.length / 1024).toFixed(1)}KB ...]`;
-			const keepBytes = Math.max(0, maxBytes - marker.length);
-			warnings.push(
-				`Project context file ${filePath} is ${(content.length / 1024).toFixed(1)}KB, truncating to ${maxBytes / 1024}KB. Use --no-project-context to skip.`,
-			);
-			return {
-				path: filePath,
-				content: content.slice(0, keepBytes) + marker,
-			};
-		}
-		return { path: filePath, content };
-	});
-	return { files: processed, warnings };
+  const warnings: string[] = [];
+  const processed = files.map(({ path: filePath, content }) => {
+    if (content.length > maxBytes) {
+      const marker = `\n\n[... truncated, file was ${(content.length / 1024).toFixed(1)}KB ...]`;
+      const keepBytes = Math.max(0, maxBytes - marker.length);
+      warnings.push(
+        `Project context file ${filePath} is ${(content.length / 1024).toFixed(1)}KB, truncating to ${maxBytes / 1024}KB. Use --no-project-context to skip.`,
+      );
+      return {
+        path: filePath,
+        content: content.slice(0, keepBytes) + marker,
+      };
+    }
+    return { path: filePath, content };
+  });
+  return { files: processed, warnings };
 }
 
 export interface LoadProjectContextResult {
-	files: ContextFile[];
-	warnings: string[];
+  files: ContextFile[];
+  warnings: string[];
 }
 
 /**
@@ -55,24 +55,24 @@ export interface LoadProjectContextResult {
  * Pass noProjectContext=true to skip discovery entirely.
  */
 export async function loadProjectContext(
-	cwd: string,
-	noProjectContext: boolean,
+  cwd: string,
+  noProjectContext: boolean,
 ): Promise<LoadProjectContextResult> {
-	if (noProjectContext) {
-		return { files: [], warnings: [] };
-	}
+  if (noProjectContext) {
+    return { files: [], warnings: [] };
+  }
 
-	// Use DefaultResourceLoader solely for its context file discovery.
-	// Disable everything else to avoid unnecessary work.
-	const loader = new DefaultResourceLoader({
-		cwd,
-		noExtensions: true,
-		noSkills: true,
-		noPromptTemplates: true,
-		noThemes: true,
-	});
-	await loader.reload();
+  // Use DefaultResourceLoader solely for its context file discovery.
+  // Disable everything else to avoid unnecessary work.
+  const loader = new DefaultResourceLoader({
+    cwd,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+  });
+  await loader.reload();
 
-	const raw = loader.getAgentsFiles().agentsFiles;
-	return processContextFiles(raw);
+  const raw = loader.getAgentsFiles().agentsFiles;
+  return processContextFiles(raw);
 }
