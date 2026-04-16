@@ -43,7 +43,7 @@ export function parseGitHubPR(input: string): GitHubPRReference | null {
 	}
 
 	// Try short format: owner/repo#123
-	const shortMatch = input.match(/^([^/]+)\/([^#]+)#(\d+)$/);
+	const shortMatch = input.match(/^([^/]+)\/([^/#]+)#(\d+)$/);
 	if (shortMatch) {
 		return {
 			owner: shortMatch[1],
