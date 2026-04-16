@@ -1,4 +1,4 @@
-.PHONY: lint lint-fix clean release
+.PHONY: lint lint-fix test clean release
 
 SOURCES := $(wildcard src/*.ts)
 
@@ -13,10 +13,14 @@ build/cli.js: $(SOURCES) build.ts node_modules/.stamp
 	bun run build.ts
 
 lint:
-	npx biome check src/
+	bunx biome check src/
+	bunx tsgo --noEmit
+
+test:
+	bun test
 
 lint-fix:
-	npx biome check --write src/
+	bunx biome check --write src/
 
 clean:
 	rm -rf build pr-review dist *.bun-build

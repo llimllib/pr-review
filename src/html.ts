@@ -1,51 +1,51 @@
 import { Marked } from "marked";
 
 export interface ReviewData {
-	id: string;
-	timestamp: string;
-	model: string;
-	agents: string[];
-	diff: string;
-	reports: Record<string, string>;
-	summary: string;
+  id: string;
+  timestamp: string;
+  model: string;
+  agents: string[];
+  diff: string;
+  reports: Record<string, string>;
+  summary: string;
 }
 
 function escapeHtml(text: string): string {
-	return text
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 export function generateHtml(data: ReviewData): string {
-	const marked = new Marked();
-	const summaryHtml = marked.parse(data.summary) as string;
+  const marked = new Marked();
+  const summaryHtml = marked.parse(data.summary) as string;
 
-	const agentSections = data.agents
-		.map((agentName) => {
-			const report = data.reports[agentName];
-			if (!report) return "";
-			const reportHtml = marked.parse(report) as string;
-			return `
+  const agentSections = data.agents
+    .map((agentName) => {
+      const report = data.reports[agentName];
+      if (!report) return "";
+      const reportHtml = marked.parse(report) as string;
+      return `
       <details class="agent-section">
         <summary class="agent-header">${escapeHtml(agentName)}</summary>
         <div class="agent-content">${reportHtml}</div>
       </details>`;
-		})
-		.join("\n");
+    })
+    .join("\n");
 
-	const date = new Date(data.timestamp);
-	const formattedDate = date.toLocaleDateString("en-US", {
-		weekday: "long",
-		year: "numeric",
-		month: "long",
-		day: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
-	});
+  const date = new Date(data.timestamp);
+  const formattedDate = date.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
-	return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
