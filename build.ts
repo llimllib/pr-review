@@ -48,6 +48,7 @@ export function getBinDir() { return join(getAgentDir(), "bin"); }
 export function getPromptsDir() { return join(getAgentDir(), "prompts"); }
 export function getSessionsDir() { return join(getAgentDir(), "sessions"); }
 export function getDebugLogPath() { return join(getAgentDir(), "pi-debug.log"); }
+export function getBundledInteractiveAssetPath(name) { return join(dirname(process.execPath), "assets", name); }
 `;
 
 await esbuild.build({

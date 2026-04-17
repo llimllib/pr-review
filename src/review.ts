@@ -474,7 +474,7 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
   const spinner = createSpinner("Loading previous session...", quiet);
 
   const authStorage = AuthStorage.create();
-  const modelRegistry = new ModelRegistry(authStorage);
+  const modelRegistry = ModelRegistry.create(authStorage);
   const model = await resolveModel(authStorage, modelRegistry, modelId);
 
   // Load project context files once
@@ -592,7 +592,7 @@ function helper() {
   const spinner = createSpinner("Initializing...", quiet || verbose);
 
   const authStorage = AuthStorage.create();
-  const modelRegistry = new ModelRegistry(authStorage);
+  const modelRegistry = ModelRegistry.create(authStorage);
   const model = await resolveModel(authStorage, modelRegistry, modelId);
 
   // Load project context files once, shared by all agents.

@@ -5,7 +5,7 @@ import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
  */
 export async function listModels(): Promise<void> {
   const authStorage = AuthStorage.create();
-  const modelRegistry = new ModelRegistry(authStorage);
+  const modelRegistry = ModelRegistry.create(authStorage);
   const models = modelRegistry.getAvailable();
 
   if (models.length === 0) {
