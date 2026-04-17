@@ -1,6 +1,6 @@
 {
   "name": "pr-review",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "type": "module",
   "bin": {
     "pr-review": "./bin/pr-review"
