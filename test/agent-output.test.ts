@@ -438,3 +438,182 @@ describe("createSpinnerRenderer", () => {
 		expect(updates.length).toBe(0);
 	});
 });
+
+// ── Retry and Error Events ─────────────────────────────────────────
+
+describe("Retry and Error Events", () => {
+	describe("verbose renderer", () => {
+		test("retry event displays attempt and error message", () => {
+			const { lines, write } = captureOutput();
+			const renderer = createVerboseRenderer(write);
+			const cb = renderer.createCallback("Bug Hunter");
+
+			cb({
+				type: "retry",
+				attempt: 1,
+				maxAttempts: 2,
+				errorMessage: "rate limit exceeded",
+			});
+
+			expect(lines.length).toBe(1);
+			const stripped = stripAnsi(lines[0]);
+			expect(stripped).toContain("[Bug Hunter]");
+			expect(stripped).toContain("Retrying (1/2)");
+			expect(stripped).toContain("rate limit exceeded");
+			expect(stripped).toContain("⟳");
+		});
+
+		test("retry event flushes pending text first", () => {
+			const { lines, write } = captureOutput();
+			const renderer = createVerboseRenderer(write);
+			const cb = renderer.createCallback("Bug Hunter");
+
+			cb({ type: "text_delta", delta: "analyzing..." });
+			expect(lines.length).toBe(0);
+
+			cb({
+				type: "retry",
+				attempt: 1,
+				maxAttempts: 2,
+				errorMessage: "timeout",
+			});
+
+			expect(lines.length).toBe(2);
+			expect(stripAnsi(lines[0])).toBe("[Bug Hunter] analyzing...\n");
+			expect(stripAnsi(lines[1])).toContain("Retrying");
+		});
+
+		test("error event displays error message", () => {
+			const { lines, write } = captureOutput();
+			const renderer = createVerboseRenderer(write);
+			const cb = renderer.createCallback("Bug Hunter");
+
+			cb({
+				type: "error",
+				errorMessage: "API key invalid",
+			});
+
+			expect(lines.length).toBe(1);
+			const stripped = stripAnsi(lines[0]);
+			expect(stripped).toContain("[Bug Hunter]");
+			expect(stripped).toContain("Error: API key invalid");
+			expect(stripped).toContain("✗");
+		});
+
+		test("error event includes red color code", () => {
+			const { lines, write } = captureOutput();
+			const renderer = createVerboseRenderer(write);
+			const cb = renderer.createCallback("Bug Hunter");
+
+			cb({
+				type: "error",
+				errorMessage: "failed",
+			});
+
+			// Should contain red color code (\x1b[31m)
+			expect(lines[0]).toContain("\x1b[31m");
+		});
+
+		test("multiple retry attempts are logged separately", () => {
+			const { lines, write } = captureOutput();
+			const renderer = createVerboseRenderer(write);
+			const cb = renderer.createCallback("Bug Hunter");
+
+			cb({
+				type: "retry",
+				attempt: 1,
+				maxAttempts: 3,
+				errorMessage: "timeout",
+			});
+			cb({
+				type: "retry",
+				attempt: 2,
+				maxAttempts: 3,
+				errorMessage: "timeout",
+			});
+			cb({
+				type: "retry",
+				attempt: 3,
+				maxAttempts: 3,
+				errorMessage: "timeout",
+			});
+
+			expect(lines.length).toBe(3);
+			expect(stripAnsi(lines[0])).toContain("Retrying (1/3)");
+			expect(stripAnsi(lines[1])).toContain("Retrying (2/3)");
+			expect(stripAnsi(lines[2])).toContain("Retrying (3/3)");
+		});
+	});
+
+	describe("spinner renderer", () => {
+		test("retry event updates spinner with retry status", () => {
+			const updates: string[] = [];
+			const spinner = { update: (text: string) => updates.push(text) };
+			const renderer = createSpinnerRenderer(spinner, () => 0, 4);
+			const cb = renderer.createCallback("Bug Hunter");
+
+			cb({
+				type: "retry",
+				attempt: 1,
+				maxAttempts: 2,
+				errorMessage: "rate limit exceeded",
+			});
+
+			expect(updates.length).toBe(1);
+			const stripped = stripAnsi(updates[0]);
+			expect(stripped).toBe("0/4 complete [Bug Hunter] ⟳ retry 1/2");
+		});
+
+		test("error event updates spinner with error status", () => {
+			const updates: string[] = [];
+			const spinner = { update: (text: string) => updates.push(text) };
+			const renderer = createSpinnerRenderer(spinner, () => 0, 4);
+			const cb = renderer.createCallback("Bug Hunter");
+
+			cb({
+				type: "error",
+				errorMessage: "API key invalid",
+			});
+
+			expect(updates.length).toBe(1);
+			const stripped = stripAnsi(updates[0]);
+			expect(stripped).toBe("0/4 complete [Bug Hunter] ✗ error");
+		});
+
+		test("error event includes red color code", () => {
+			const updates: string[] = [];
+			const spinner = { update: (text: string) => updates.push(text) };
+			const renderer = createSpinnerRenderer(spinner, () => 0, 4);
+			const cb = renderer.createCallback("Bug Hunter");
+
+			cb({
+				type: "error",
+				errorMessage: "failed",
+			});
+
+			// Should contain red color code (\x1b[31m)
+			expect(updates[0]).toContain("\x1b[31m");
+		});
+
+		test("retry and error events work with completed count", () => {
+			const updates: string[] = [];
+			const spinner = { update: (text: string) => updates.push(text) };
+			let completed = 2;
+			const renderer = createSpinnerRenderer(
+				spinner,
+				() => completed,
+				4,
+			);
+			const cb = renderer.createCallback("Bug Hunter");
+
+			cb({
+				type: "retry",
+				attempt: 2,
+				maxAttempts: 2,
+				errorMessage: "timeout",
+			});
+
+			expect(stripAnsi(updates[0])).toStartWith("2/4 complete");
+		});
+	});
+});

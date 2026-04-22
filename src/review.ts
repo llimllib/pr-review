@@ -298,8 +298,18 @@ async function runSubAgent(
   modelRegistry: ModelRegistry,
   additionalContext: string,
   contextFiles: ContextFile[],
+  sessionId: string,
   onOutput?: AgentOutputCallback,
 ): Promise<{ report: string; usage: TokenUsage }> {
+  // Create a subdirectory for this agent's session
+  const sessionDir = getSessionDir(sessionId);
+  const agentSessionDir = path.join(
+    sessionDir,
+    "agents",
+    agent.name.toLowerCase().replace(/\s+/g, "-"),
+  );
+  fs.mkdirSync(agentSessionDir, { recursive: true });
+
   const { session } = await createAgentSession({
     cwd,
     model,
@@ -308,7 +318,7 @@ async function runSubAgent(
     modelRegistry,
     resourceLoader: makeResourceLoader(agent.systemPrompt, contextFiles),
     tools: createSandboxedReadOnlyTools(cwd),
-    sessionManager: SessionManager.inMemory(),
+    sessionManager: SessionManager.create(cwd, agentSessionDir),
     settingsManager: SettingsManager.inMemory({
       compaction: { enabled: false },
       retry: { enabled: true, maxRetries: 2 },
@@ -317,6 +327,9 @@ async function runSubAgent(
 
   let result = "";
   const usage = emptyTokenUsage();
+  let hadError = false;
+  let finalError = "";
+
   const unsubscribe = session.subscribe((event) => {
     if (
       event.type === "message_update" &&
@@ -339,6 +352,24 @@ async function runSubAgent(
       event.message.role === "assistant"
     ) {
       addUsage(usage, event.message.usage);
+    } else if (event.type === "auto_retry_start") {
+      debug(
+        `Agent ${agent.name}: Retry attempt ${event.attempt}/${event.maxAttempts} - ${event.errorMessage}`,
+      );
+      onOutput?.({
+        type: "retry",
+        attempt: event.attempt,
+        maxAttempts: event.maxAttempts,
+        errorMessage: event.errorMessage,
+      });
+    } else if (event.type === "auto_retry_end" && !event.success) {
+      hadError = true;
+      finalError = event.finalError || "Unknown error";
+      debug(`Agent ${agent.name}: Failed after retries - ${finalError}`);
+      onOutput?.({
+        type: "error",
+        errorMessage: finalError,
+      });
     }
   });
 
@@ -351,6 +382,11 @@ async function runSubAgent(
   onOutput?.({ type: "agent_complete" });
   unsubscribe();
   session.dispose();
+
+  // If the agent failed after retries, throw an error to fail the whole review
+  if (hadError) {
+    throw new Error(`Agent ${agent.name} failed: ${finalError}`);
+  }
 
   return { report: result, usage };
 }
@@ -627,6 +663,10 @@ function helper() {
 
   spinner.update(`Running agents... (0/${total})`);
 
+  // Generate a session ID for this review (needed for agent session storage)
+  const sessionId = uuidv7();
+  const modelLabel = `${model.provider}/${model.id}`;
+
   // Run sub-agents in parallel
   const totalUsage = emptyTokenUsage();
   const agentPromises = agentNames.map(async (name) => {
@@ -644,6 +684,7 @@ function helper() {
       modelRegistry,
       additionalContext,
       contextFiles,
+      sessionId,
       onOutput,
     );
 
@@ -672,11 +713,7 @@ function helper() {
 
   const outputWriter = createOutputWriter(colorMode);
 
-  // Generate a session ID for this review
-  const sessionId = uuidv7();
-  const modelLabel = `${model.provider}/${model.id}`;
-
-  // Run summarizer
+  // Run summarizer (sessionId and modelLabel already defined above)
   const { summary: summaryText, usage: summarizerUsage } = await runSummarizer(
     diff,
     reports,

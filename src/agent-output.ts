@@ -43,7 +43,14 @@ export function formatToolAction(
 export type AgentOutputEvent =
   | { type: "text_delta"; delta: string }
   | { type: "tool_start"; toolName: string; args: Record<string, unknown> }
-  | { type: "agent_complete" };
+  | { type: "agent_complete" }
+  | {
+      type: "retry";
+      attempt: number;
+      maxAttempts: number;
+      errorMessage: string;
+    }
+  | { type: "error"; errorMessage: string };
 
 /**
  * Callback for a single agent's output. Created by a renderer via
@@ -128,6 +135,20 @@ export function createVerboseRenderer(
         flushLineBuffer(agentName);
         break;
       }
+      case "retry": {
+        flushLineBuffer(agentName);
+        write(
+          `${tag(agentName)} ${DIM}⟳ Retrying (${event.attempt}/${event.maxAttempts}): ${event.errorMessage}${RESET}\n`,
+        );
+        break;
+      }
+      case "error": {
+        flushLineBuffer(agentName);
+        write(
+          `${tag(agentName)} \x1b[31m✗ Error: ${event.errorMessage}${RESET}\n`,
+        );
+        break;
+      }
     }
   }
 
@@ -175,6 +196,15 @@ export function createSpinnerRenderer(
       const done = getCompleted() + 1;
       spinner.update(
         `${done}/${total} complete ${color}[${agentName}]${RESET} ${DIM}done${RESET}`,
+      );
+    } else if (event.type === "retry") {
+      spinner.update(
+        `${getCompleted()}/${total} complete ${color}[${agentName}]${RESET} ${DIM}⟳ retry ${event.attempt}/${event.maxAttempts}${RESET}`,
+      );
+    } else if (event.type === "error") {
+      // Stop spinner and show error
+      spinner.update(
+        `${getCompleted()}/${total} complete ${color}[${agentName}]${RESET} \x1b[31m✗ error${RESET}`,
       );
     }
   }
