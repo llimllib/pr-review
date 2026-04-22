@@ -23,6 +23,8 @@ import type { AgentDefinition } from "./agents.ts";
 import { AGENTS, SUMMARIZER_PROMPT } from "./agents.ts";
 import type { ContextFile } from "./context.ts";
 import { loadProjectContext } from "./context.ts";
+import type { PullRequest } from "./github.ts";
+import { formatPRUrl } from "./github.ts";
 import type { ReviewData } from "./html.ts";
 import { generateHtml } from "./html.ts";
 import type { ColorMode, OutputWriter } from "./output.ts";
@@ -215,6 +217,7 @@ export interface ReviewOptions {
   additionalContext: string;
   colorMode: ColorMode;
   noProjectContext: boolean;
+  prInfo?: PullRequest;
 }
 
 export interface ContinueOptions {
@@ -572,6 +575,7 @@ export async function runReview(options: ReviewOptions): Promise<void> {
     additionalContext,
     colorMode,
     noProjectContext,
+    prInfo,
   } = options;
 
   // Test mode: output mock content without calling LLM
@@ -713,6 +717,16 @@ function helper() {
 
   const outputWriter = createOutputWriter(colorMode);
 
+  // If reviewing a PR, display the PR URL and commit before the summary
+  if (prInfo) {
+    summarizerSpinner.stop();
+    const prUrl = formatPRUrl(prInfo);
+    const shortCommit = prInfo.headRefOid.substring(0, 7);
+    outputWriter.write(
+      `\x1b[34mReviewing ${prUrl} at commit ${shortCommit}\x1b[0m\n\n`,
+    );
+  }
+
   // Run summarizer (sessionId and modelLabel already defined above)
   const { summary: summaryText, usage: summarizerUsage } = await runSummarizer(
     diff,
@@ -745,6 +759,8 @@ function helper() {
     diff,
     reports: Object.fromEntries(reports),
     summary: summaryText,
+    prUrl: prInfo ? formatPRUrl(prInfo) : undefined,
+    prCommit: prInfo?.headRefOid,
   };
 
   const sessionDir = getSessionDir(sessionId);

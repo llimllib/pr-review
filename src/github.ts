@@ -13,6 +13,7 @@ export interface PullRequest {
   body: string;
   headRefName: string;
   baseRefName: string;
+  headRefOid: string;
 }
 
 export interface GitHubPRReference {
@@ -76,7 +77,7 @@ export function fetchPRMetadata(ref: GitHubPRReference): PullRequest {
   let output: string;
   try {
     output = execSync(
-      `gh pr view ${ref.number} --repo ${repoArg} --json title,body,headRefName,baseRefName`,
+      `gh pr view ${ref.number} --repo ${repoArg} --json title,body,headRefName,baseRefName,headRefOid`,
       {
         encoding: "utf-8",
         stdio: ["ignore", "pipe", "pipe"],
@@ -109,6 +110,7 @@ export function fetchPRMetadata(ref: GitHubPRReference): PullRequest {
     body: data.body || "",
     headRefName: data.headRefName || "",
     baseRefName: data.baseRefName || "",
+    headRefOid: data.headRefOid || "",
   };
 }
 
@@ -170,8 +172,16 @@ export function formatPRContext(pr: PullRequest): string {
   let context = `# Pull Request: ${pr.title}\n\n`;
   context += `**Repository:** ${pr.owner}/${pr.repo}\n`;
   context += `**PR:** #${pr.number}\n`;
-  context += `**Branches:** ${pr.headRefName} → ${pr.baseRefName}\n\n`;
+  context += `**Branches:** ${pr.headRefName} → ${pr.baseRefName}\n`;
+  context += `**Commit:** ${pr.headRefOid}\n\n`;
   context += `## Description\n\n`;
   context += pr.body || "No description provided.";
   return context;
+}
+
+/**
+ * Format PR URL for display in review output.
+ */
+export function formatPRUrl(pr: PullRequest): string {
+  return `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
 }

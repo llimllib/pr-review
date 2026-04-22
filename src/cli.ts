@@ -7,6 +7,7 @@ import {
   fetchPRDiff,
   fetchPRMetadata,
   formatPRContext,
+  type PullRequest,
   parseGitHubPR,
 } from "./github.ts";
 import { listModels } from "./list-models.ts";
@@ -312,6 +313,7 @@ if (listModelsFlag) {
   const prRef = firstArg ? parseGitHubPR(firstArg) : null;
 
   let diff: string;
+  let prInfo: PullRequest | undefined;
   if (prRef) {
     // GitHub PR mode
     if (gitArgs.length > 1) {
@@ -323,8 +325,8 @@ if (listModelsFlag) {
 
     try {
       // Fetch PR metadata for context
-      const pr = fetchPRMetadata(prRef);
-      const prContext = formatPRContext(pr);
+      prInfo = fetchPRMetadata(prRef);
+      const prContext = formatPRContext(prInfo);
 
       // Prepend PR context to any additional context
       if (additionalContext) {
@@ -395,6 +397,7 @@ if (listModelsFlag) {
     additionalContext,
     colorMode,
     noProjectContext,
+    prInfo,
   })
     .then(() => {
       process.exit(0);

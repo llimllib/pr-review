@@ -8,6 +8,8 @@ export interface ReviewData {
   diff: string;
   reports: Record<string, string>;
   summary: string;
+  prUrl?: string;
+  prCommit?: string;
 }
 
 function escapeHtml(text: string): string {
@@ -44,6 +46,16 @@ export function generateHtml(data: ReviewData): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  // Build PR info section if available
+  let prInfoSection = "";
+  if (data.prUrl && data.prCommit) {
+    const shortCommit = data.prCommit.substring(0, 7);
+    prInfoSection = `<span>🔗 <a href="${escapeHtml(data.prUrl)}" target="_blank">${escapeHtml(data.prUrl)}</a></span>
+    <span>📌 Commit: <code>${escapeHtml(shortCommit)}</code></span>`;
+  } else if (data.prUrl) {
+    prInfoSection = `<span>🔗 <a href="${escapeHtml(data.prUrl)}" target="_blank">${escapeHtml(data.prUrl)}</a></span>`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -109,6 +121,20 @@ export function generateHtml(data: ReviewData): string {
   .header .meta {
     color: var(--muted);
     font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .header .meta.pr-info {
+    margin-top: 0.5rem;
+  }
+
+  .header .meta a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .header .meta a:hover {
+    text-decoration: underline;
   }
 
   .header .meta span {
@@ -242,6 +268,7 @@ export function generateHtml(data: ReviewData): string {
     <span>🤖 ${escapeHtml(data.model)}</span>
     <span>🔑 ${escapeHtml(data.id)}</span>
   </div>
+  ${prInfoSection ? `<div class="meta pr-info">${prInfoSection}</div>` : ""}
 </div>
 
 <h2 class="agents-heading">Agent Reports</h2>
