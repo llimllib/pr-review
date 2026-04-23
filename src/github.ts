@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 interface ExecError extends Error {
   status?: number;
@@ -61,7 +61,7 @@ export function parseGitHubPR(input: string): GitHubPRReference | null {
  */
 export function isGitHubCLIAvailable(): boolean {
   try {
-    execSync("gh --version", { stdio: "ignore" });
+    execFileSync("gh", ["--version"], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -76,8 +76,17 @@ export function fetchPRMetadata(ref: GitHubPRReference): PullRequest {
 
   let output: string;
   try {
-    output = execSync(
-      `gh pr view ${ref.number} --repo ${repoArg} --json title,body,headRefName,baseRefName,headRefOid`,
+    output = execFileSync(
+      "gh",
+      [
+        "pr",
+        "view",
+        String(ref.number),
+        "--repo",
+        repoArg,
+        "--json",
+        "title,body,headRefName,baseRefName,headRefOid",
+      ],
       {
         encoding: "utf-8",
         stdio: ["ignore", "pipe", "pipe"],
@@ -134,18 +143,19 @@ export function fetchPRDiff(
   excludePatterns: string[] = [],
 ): string {
   const repoArg = `${ref.owner}/${ref.repo}`;
-  const excludeArgs = buildExcludeArgs(excludePatterns);
 
   let diff: string;
   try {
-    diff = execSync(
-      `gh pr diff ${ref.number} --repo ${repoArg}${excludeArgs}`,
-      {
-        encoding: "utf-8",
-        maxBuffer: 10 * 1024 * 1024,
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
+    const args = ["pr", "diff", String(ref.number), "--repo", repoArg];
+    // Add exclude patterns
+    for (const pattern of excludePatterns) {
+      args.push("-e", pattern);
+    }
+    diff = execFileSync("gh", args, {
+      encoding: "utf-8",
+      maxBuffer: 10 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
   } catch (err) {
     const execErr = err as ExecError;
     if (execErr.status === 127) {

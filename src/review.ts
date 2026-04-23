@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -23,6 +23,8 @@ import type { AgentDefinition } from "./agents.ts";
 import { AGENTS, SUMMARIZER_PROMPT } from "./agents.ts";
 import type { ContextFile } from "./context.ts";
 import { loadProjectContext } from "./context.ts";
+import type { GitDiffContext } from "./git-context.ts";
+import { formatGitDiffContext } from "./git-context.ts";
 import type { PullRequest } from "./github.ts";
 import { formatPRUrl } from "./github.ts";
 import type { ReviewData } from "./html.ts";
@@ -204,7 +206,7 @@ export function openHtmlReport(sessionId: string): void {
       `No HTML report found for session ${resolved}. Was this review run with an older version?`,
     );
   }
-  execSync(`open ${JSON.stringify(htmlFile)}`, { stdio: "ignore" });
+  execFileSync("open", [htmlFile], { stdio: "ignore" });
 }
 
 export interface ReviewOptions {
@@ -218,6 +220,7 @@ export interface ReviewOptions {
   colorMode: ColorMode;
   noProjectContext: boolean;
   prInfo?: PullRequest;
+  gitContext?: GitDiffContext;
 }
 
 export interface ContinueOptions {
@@ -260,8 +263,7 @@ async function resolveModel(
 
   if (effectiveModelId) {
     // Try to find by id across all providers
-    const available = await modelRegistry.getAvailable();
-    for (const m of available) {
+    for (const m of modelRegistry.getAvailable()) {
       if (
         m.id === effectiveModelId ||
         `${m.provider}/${m.id}` === effectiveModelId
@@ -281,7 +283,7 @@ async function resolveModel(
     if (key) return sonnet;
   }
 
-  const available = await modelRegistry.getAvailable();
+  const available = modelRegistry.getAvailable();
   if (available.length === 0) {
     throw new Error(
       "No API key configured. Either:\n" +
@@ -576,6 +578,7 @@ export async function runReview(options: ReviewOptions): Promise<void> {
     colorMode,
     noProjectContext,
     prInfo,
+    gitContext,
   } = options;
 
   // Test mode: output mock content without calling LLM
@@ -717,13 +720,18 @@ function helper() {
 
   const outputWriter = createOutputWriter(colorMode);
 
-  // If reviewing a PR, display the PR URL and commit before the summary
+  // Display what's being reviewed before the summary
   if (prInfo) {
     summarizerSpinner.stop();
     const prUrl = formatPRUrl(prInfo);
     const shortCommit = prInfo.headRefOid.substring(0, 7);
     outputWriter.write(
       `\x1b[34mReviewing ${prUrl} at commit ${shortCommit}\x1b[0m\n\n`,
+    );
+  } else if (gitContext) {
+    summarizerSpinner.stop();
+    outputWriter.write(
+      `\x1b[34m${formatGitDiffContext(gitContext)}\x1b[0m\n\n`,
     );
   }
 
@@ -761,6 +769,7 @@ function helper() {
     summary: summaryText,
     prUrl: prInfo ? formatPRUrl(prInfo) : undefined,
     prCommit: prInfo?.headRefOid,
+    gitContext: gitContext ? formatGitDiffContext(gitContext) : undefined,
   };
 
   const sessionDir = getSessionDir(sessionId);

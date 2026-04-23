@@ -1,8 +1,10 @@
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { setBedrockProviderModule } from "@mariozechner/pi-ai";
 import { bedrockProviderModule } from "@mariozechner/pi-ai/bedrock-provider";
 import pkg from "../package.json";
 import { ALL_AGENT_NAMES } from "./agents.ts";
+import type { GitDiffContext } from "./git-context.ts";
+import { parseGitDiffArgs } from "./git-context.ts";
 import {
   fetchPRDiff,
   fetchPRMetadata,
@@ -205,7 +207,7 @@ while (i < args.length) {
       if (args[i]! === "-") {
         // Read from stdin
         try {
-          additionalContext += execSync("cat", {
+          additionalContext += execFileSync("cat", [], {
             stdio: ["inherit", "pipe", "pipe"],
           }).toString();
         } catch {
@@ -314,6 +316,7 @@ if (listModelsFlag) {
 
   let diff: string;
   let prInfo: PullRequest | undefined;
+  let gitContext: GitDiffContext | undefined;
   if (prRef) {
     // GitHub PR mode
     if (gitArgs.length > 1) {
@@ -350,6 +353,9 @@ if (listModelsFlag) {
     }
   } else {
     // Git diff mode
+    // Parse git context before adding our options
+    gitContext = parseGitDiffArgs(gitArgs, cwd) || undefined;
+
     // Add default unified context if not specified
     if (!hasUnifiedContext) {
       gitArgs.unshift(`-U${contextValue}`);
@@ -398,6 +404,7 @@ if (listModelsFlag) {
     colorMode,
     noProjectContext,
     prInfo,
+    gitContext,
   })
     .then(() => {
       process.exit(0);

@@ -10,6 +10,7 @@ export interface ReviewData {
   summary: string;
   prUrl?: string;
   prCommit?: string;
+  gitContext?: string;
 }
 
 function escapeHtml(text: string): string {
@@ -47,14 +48,16 @@ export function generateHtml(data: ReviewData): string {
     minute: "2-digit",
   });
 
-  // Build PR info section if available
-  let prInfoSection = "";
+  // Build PR/git info section if available
+  let contextSection = "";
   if (data.prUrl && data.prCommit) {
     const shortCommit = data.prCommit.substring(0, 7);
-    prInfoSection = `<span>🔗 <a href="${escapeHtml(data.prUrl)}" target="_blank">${escapeHtml(data.prUrl)}</a></span>
+    contextSection = `<span>🔗 <a href="${escapeHtml(data.prUrl)}" target="_blank">${escapeHtml(data.prUrl)}</a></span>
     <span>📌 Commit: <code>${escapeHtml(shortCommit)}</code></span>`;
   } else if (data.prUrl) {
-    prInfoSection = `<span>🔗 <a href="${escapeHtml(data.prUrl)}" target="_blank">${escapeHtml(data.prUrl)}</a></span>`;
+    contextSection = `<span>🔗 <a href="${escapeHtml(data.prUrl)}" target="_blank">${escapeHtml(data.prUrl)}</a></span>`;
+  } else if (data.gitContext) {
+    contextSection = `<span>📊 ${escapeHtml(data.gitContext)}</span>`;
   }
 
   return `<!DOCTYPE html>
@@ -268,7 +271,7 @@ export function generateHtml(data: ReviewData): string {
     <span>🤖 ${escapeHtml(data.model)}</span>
     <span>🔑 ${escapeHtml(data.id)}</span>
   </div>
-  ${prInfoSection ? `<div class="meta pr-info">${prInfoSection}</div>` : ""}
+  ${contextSection ? `<div class="meta pr-info">${contextSection}</div>` : ""}
 </div>
 
 <h2 class="agents-heading">Agent Reports</h2>
