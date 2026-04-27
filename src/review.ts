@@ -277,7 +277,7 @@ async function resolveModel(
   }
 
   // Default: try sonnet first, then whatever is available
-  const sonnet = getModel("anthropic", "claude-sonnet-4-20250514");
+  const sonnet = getModel("anthropic", "claude-sonnet-4-6");
   if (sonnet) {
     const key = await authStorage.getApiKey("anthropic");
     if (key) return sonnet;

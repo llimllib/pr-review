@@ -66,7 +66,7 @@ export OPENROUTER_API_KEY=...
 npm install -g @mariozechner/pi-coding-agent && pi "/login"
 ```
 
-The default model is `claude-sonnet-4-20250514`. Use `-m` to specify a different model.
+The default model is `claude-sonnet-4-6`. Use `-m` to specify a different model.
 
 ## Usage
 
@@ -132,12 +132,12 @@ The model is selected in this order of priority:
 
 1. `-m`/`--model` flag
 2. `PR_REVIEW_MODEL` environment variable
-3. `claude-sonnet-4-20250514` (if `ANTHROPIC_API_KEY` is set)
+3. `claude-sonnet-4-6` (if `ANTHROPIC_API_KEY` is set)
 4. First available model from configured API keys
 
 Model format: `provider/model-id` or just `model-id`.
 
-Examples: `anthropic/claude-sonnet-4-20250514`, `gpt-4o`, `bedrock/anthropic.claude-3-sonnet`
+Examples: `anthropic/claude-sonnet-4-6`, `gpt-4o`, `bedrock/anthropic.claude-4-sonnet`
 
 Use `--list-models` to see all available models for your configured API keys.
 
