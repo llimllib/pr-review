@@ -81,7 +81,9 @@ const { session } = await createAgentSession({
     cwd,
     model,
     resourceLoader: makeResourceLoader(systemPrompt, contextFiles),
-    tools: createReadOnlyTools(cwd),  // or [] for summarizer
+    // customTools provides tool implementations; tools is a string[] allowlist
+    customTools: createReadOnlyTools(cwd),
+    tools: ["read", "grep", "find", "ls"],  // or [] for summarizer
     sessionManager: SessionManager.inMemory(),  // or persisted
 });
 

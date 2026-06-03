@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { setBedrockProviderModule } from "@mariozechner/pi-ai";
-import { bedrockProviderModule } from "@mariozechner/pi-ai/bedrock-provider";
+import { setBedrockProviderModule } from "@earendil-works/pi-ai";
+import { bedrockProviderModule } from "@earendil-works/pi-ai/bedrock-provider";
 import pkg from "../package.json";
 import { ALL_AGENT_NAMES } from "./agents.ts";
 import type { GitDiffContext } from "./git-context.ts";

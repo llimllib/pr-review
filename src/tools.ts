@@ -7,7 +7,7 @@
  */
 
 import * as path from "node:path";
-import { createReadOnlyTools } from "@mariozechner/pi-coding-agent";
+import { createReadOnlyTools } from "@earendil-works/pi-coding-agent";
 
 type Tool = ReturnType<typeof createReadOnlyTools>[number];
 
