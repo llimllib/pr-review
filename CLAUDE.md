@@ -4,22 +4,43 @@ This file provides context for AI assistants working on this codebase.
 
 ## Important Rules
 
-**Never commit to main and push without explicit permission.** Always create a branch and PR for changes, or ask before pushing to main.
+- **Never commit to main and push without explicit permission.** Always create a branch and PR for changes, or ask before pushing to main.
+- **Run the lints and tests when you're done writing code** with `make lint test`
 
 ## Project Overview
 
 `pr-review` is a CLI tool that runs multiple specialized AI agents to review git diffs. It's built with TypeScript, bundled with esbuild, and compiled to a standalone binary with Bun.
 
+## Commands
+
+```
+# build a binary at ./pr-review
+make
+
+# run the tests
+make test
+
+# run the lints
+make lint
+```
+
 ## Architecture
 
 ```
 src/
-├── cli.ts      # Argument parsing, main entry point
-├── agents.ts   # Agent definitions and system prompts
-├── context.ts  # Project context file discovery and truncation
-├── github.ts   # GitHub PR URL parsing and fetching via gh CLI
-├── review.ts   # Core review logic, session management
-└── spinner.ts  # CLI spinner for progress feedback
+├── agent-output.ts  # Verbose/spinner renderers for streaming agent output
+├── agents.ts        # Agent definitions and system prompts
+├── cli.ts           # Argument parsing, main entry point
+├── context.ts       # Project context file discovery and truncation
+├── git-context.ts   # Git diff argument parsing and formatting
+├── github.ts        # GitHub PR URL parsing and fetching via gh CLI
+├── html.ts          # HTML report generation from ReviewData
+├── list-models.ts   # --list-models command implementation
+├── markdown.ts      # Markdown report generation from ReviewData
+├── output.ts        # Output writer with color/pager support
+├── review.ts        # Core review logic, session management
+├── spinner.ts       # CLI spinner for progress feedback
+└── tools.ts         # Sandboxed read-only tools for sub-agents
 ```
 
 ### Key Components
@@ -37,26 +58,17 @@ src/
 
 - **GitHub PR support** (`github.ts`): Parses GitHub PR URLs (full URLs or `owner/repo#123` format) and fetches PR metadata and diffs using the GitHub CLI (`gh`). PR description is included as additional context for agents. Requires `gh` to be installed and authenticated for private repos.
 
-- **Session persistence**: Sessions are saved to `~/.cache/pr-review/last-session.jsonl` using pi's `SessionManager`. This enables the `-c/--continue` feature.
+- **Git context** (`git-context.ts`): Parses git diff arguments to determine what's being compared (branch, commit range, staged changes) and formats it for display.
 
-## Build System
+- **Report generation** (`html.ts`, `markdown.ts`): Generates HTML and Markdown reports from `ReviewData`. Both formats include the summary, individual agent reports, and any follow-up discussions.
 
-Two-stage build process:
+- **Output** (`output.ts`): Handles colorized terminal output with optional pager support (bat/mdriver).
 
-1. **Bundle** (`build.ts`): Uses esbuild to bundle TypeScript and stub out pi's config loading (we don't need it)
-2. **Compile** (`Makefile`): Uses `bun build --compile` to create standalone binary
+- **Agent output** (`agent-output.ts`): Two rendering modes for sub-agent progress — spinner (default) shows tool actions in the spinner text, verbose streams each agent's output with colored labels.
 
-```bash
-bun run build.ts              # Creates build/cli.js
-bun build --compile ...       # Creates ./pr-review binary
-```
+- **Tools** (`tools.ts`): Sandboxed read-only filesystem tools (read, grep, find, ls) that prevent path traversal outside the project directory.
 
-## Dependencies
-
-- `@mariozechner/pi-ai` - Model definitions and types
-- `@mariozechner/pi-coding-agent` - Agent sessions, tools, session management
-
-Run `bun install` when any depedency changes are made to make sure you update the bun.lock lockfile
+- **Session persistence**: Each review gets a UUIDv7 session ID. Sessions are stored in `~/.cache/pr-review/<session-id>/` with `session.jsonl`, `reports.json`, `review.html`, and `review.md`. A `last` symlink points to the most recent session for `-c/--continue`.
 
 ## Key Patterns
 
@@ -79,32 +91,6 @@ session.subscribe((event) => {
 
 await session.prompt(userMessage);
 session.dispose();
-```
-
-### Spinner Usage
-
-```typescript
-const spinner = createSpinner("Loading...", quiet);
-spinner.update("New status...");
-spinner.succeed("Done");  // or spinner.fail("Error")
-spinner.stop();  // Clear without message
-```
-
-## Testing Changes
-
-```bash
-# Quick test with one agent
-./pr-review -a quality HEAD~1
-
-# Test with GitHub PR URL
-./pr-review https://github.com/owner/repo/pull/123
-./pr-review owner/repo#123
-
-# Test continuation
-./pr-review -c "summarize in one sentence"
-
-# Test quiet mode
-./pr-review -q -a bug HEAD~1
 ```
 
 ## Development Workflow
@@ -130,4 +116,4 @@ Edit `SUMMARIZER_PROMPT` in `agents.ts`
 
 ### Changing session storage location
 
-Modify `SESSION_DIR` and `SESSION_FILE` constants in `review.ts`
+Modify `CACHE_DIR` constant in `review.ts`
