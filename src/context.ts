@@ -1,4 +1,6 @@
-import { DefaultResourceLoader } from "@mariozechner/pi-coding-agent";
+import * as os from "node:os";
+import * as path from "node:path";
+import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 
 // Maximum size (in bytes) of project context files to include.
 // Files larger than this are truncated and a warning is emitted.
@@ -64,8 +66,11 @@ export async function loadProjectContext(
 
   // Use DefaultResourceLoader solely for its context file discovery.
   // Disable everything else to avoid unnecessary work.
+  const agentDir =
+    process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), ".pi", "agent");
   const loader = new DefaultResourceLoader({
     cwd,
+    agentDir,
     noExtensions: true,
     noSkills: true,
     noPromptTemplates: true,

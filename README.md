@@ -1,6 +1,6 @@
 # pr-review
 
-A CLI tool based on [pi](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) that uses multiple specialized AI agents to review code changes. Each agent focuses on a different aspect of the review, then a summarizer synthesizes their findings into a single coherent report.
+A CLI tool based on [pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) that uses multiple specialized AI agents to review code changes. Each agent focuses on a different aspect of the review, then a summarizer synthesizes their findings into a single coherent report.
 
 ## Preview
 
@@ -63,7 +63,7 @@ export OPENROUTER_API_KEY=...
 # ... or any other provider supported by pi
 
 # Or use pi's interactive auth
-npm install -g @mariozechner/pi-coding-agent && pi "/login"
+npm install -g @earendil-works/pi-coding-agent && pi "/login"
 ```
 
 The default model is `claude-sonnet-4-6`. Use `-m` to specify a different model.

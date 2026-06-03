@@ -3,9 +3,9 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Api, Model, Usage } from "@mariozechner/pi-ai";
-import { getModel } from "@mariozechner/pi-ai";
-import type { ResourceLoader } from "@mariozechner/pi-coding-agent";
+import type { Api, Model, Usage } from "@earendil-works/pi-ai";
+import { getModel } from "@earendil-works/pi-ai";
+import type { ResourceLoader } from "@earendil-works/pi-coding-agent";
 import {
   AuthStorage,
   createAgentSession,
@@ -13,7 +13,7 @@ import {
   ModelRegistry,
   SessionManager,
   SettingsManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import type { AgentOutputCallback } from "./agent-output.ts";
 import {
   createSpinnerRenderer,
@@ -349,7 +349,10 @@ async function runSubAgent(
     authStorage,
     modelRegistry,
     resourceLoader: makeResourceLoader(agent.systemPrompt, contextFiles),
-    tools: createSandboxedReadOnlyTools(cwd),
+    // pi@0.78.0 API: `customTools` provides tool implementations,
+    // `tools` is a string[] allowlist of which tool names the agent can invoke
+    customTools: createSandboxedReadOnlyTools(cwd),
+    tools: ["read", "grep", "find", "ls"],
     sessionManager: SessionManager.create(cwd, agentSessionDir),
     settingsManager: SettingsManager.inMemory({
       compaction: { enabled: false },
