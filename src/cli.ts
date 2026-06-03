@@ -14,7 +14,12 @@ import {
 } from "./github.ts";
 import { listModels } from "./list-models.ts";
 import type { ColorMode } from "./output.ts";
-import { continueReview, openHtmlReport, runReview } from "./review.ts";
+import {
+  continueReview,
+  openHtmlReport,
+  openMarkdownReport,
+  runReview,
+} from "./review.ts";
 
 // esbuild can't bundle dynamic imports, so we import the Bedrock provider
 // statically and override the module loader
@@ -39,6 +44,7 @@ Options:
   --list-models          List available models and exit
   --no-project-context   do not include AGENTS.md/CLAUDE.md from the project
   --html [ID]            Open the HTML report for a session (default: last)
+  --markdown [ID]        Print the Markdown report for a session (default: last)
   -m, --model ID         Model to use (see Models section below)
   -q, --quiet            Suppress progress output (spinners, status messages)
   -v, --verbose          Show each sub-agent's output before the summary
@@ -100,6 +106,7 @@ let hasUnifiedContext = false;
 let continueMessage: string | undefined;
 let colorMode: ColorMode = "auto";
 let htmlSessionId: string | undefined;
+let markdownSessionId: string | undefined;
 let listModelsFlag = false;
 let noProjectContext = false;
 const excludePatterns: string[] = [];
@@ -198,6 +205,17 @@ while (i < args.length) {
         htmlSessionId = "last";
       }
       break;
+    case "--markdown":
+    case "--md":
+      i++;
+      // Session ID is optional; default to "last"
+      if (i < args.length && !args[i]!.startsWith("-")) {
+        markdownSessionId = args[i]!;
+        i++;
+      } else {
+        markdownSessionId = "last";
+      }
+      break;
     case "--context":
       i++;
       if (i >= args.length) {
@@ -286,6 +304,16 @@ if (listModelsFlag) {
   // Handle HTML report mode
   try {
     openHtmlReport(htmlSessionId);
+  } catch (err) {
+    console.error(
+      `\x1b[31m❌ ${err instanceof Error ? err.message : String(err)}\x1b[0m`,
+    );
+    process.exit(1);
+  }
+} else if (markdownSessionId) {
+  // Handle Markdown report mode
+  try {
+    openMarkdownReport(markdownSessionId);
   } catch (err) {
     console.error(
       `\x1b[31m❌ ${err instanceof Error ? err.message : String(err)}\x1b[0m`,
