@@ -27,7 +27,7 @@ import type { GitDiffContext } from "./git-context.ts";
 import { formatGitDiffContext } from "./git-context.ts";
 import type { PullRequest } from "./github.ts";
 import { formatPRUrl } from "./github.ts";
-import type { ReviewData } from "./html.ts";
+import type { FollowUp, ReviewData } from "./html.ts";
 import { generateHtml } from "./html.ts";
 import type { ColorMode, OutputWriter } from "./output.ts";
 import { createOutputWriter } from "./output.ts";
@@ -493,8 +493,10 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
   // Check if we have a previous session — try new location first, then legacy
   let sessionFile: string;
   let sessionDir: string;
+  let sessionId: string | undefined;
   if (fs.existsSync(LAST_LINK)) {
     const lastId = fs.readlinkSync(LAST_LINK);
+    sessionId = lastId;
     sessionDir = getSessionDir(lastId);
     sessionFile = getSessionFile(lastId);
   } else if (fs.existsSync(LEGACY_SESSION_FILE)) {
@@ -546,12 +548,14 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
   spinner.succeed("Session loaded");
 
   const outputWriter = createOutputWriter(colorMode);
+  let responseText = "";
 
   const unsubscribe = session.subscribe((event) => {
     if (
       event.type === "message_update" &&
       event.assistantMessageEvent.type === "text_delta"
     ) {
+      responseText += event.assistantMessageEvent.delta;
       outputWriter.write(event.assistantMessageEvent.delta);
     }
   });
@@ -562,6 +566,32 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
   await outputWriter.end();
   if (!outputWriter.endsWithNewline()) {
     process.stdout.write("\n");
+  }
+
+  // Save follow-up to the review data and regenerate HTML
+  if (sessionId) {
+    const reportsFile = getReportsFile(sessionId);
+    if (fs.existsSync(reportsFile)) {
+      try {
+        const reviewData: ReviewData = JSON.parse(
+          fs.readFileSync(reportsFile, "utf-8"),
+        );
+        const followup: FollowUp = {
+          question: message,
+          answer: responseText,
+          timestamp: new Date().toISOString(),
+        };
+        if (!reviewData.followups) {
+          reviewData.followups = [];
+        }
+        reviewData.followups.push(followup);
+        fs.writeFileSync(reportsFile, JSON.stringify(reviewData));
+        fs.writeFileSync(getHtmlFile(sessionId), generateHtml(reviewData));
+      } catch {
+        // Non-fatal: if we can't update the HTML, the conversation still worked
+        debug("Failed to update HTML report with follow-up");
+      }
+    }
   }
 }
 
