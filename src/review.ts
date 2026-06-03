@@ -427,7 +427,6 @@ async function runSubAgent(
 }
 
 async function runSummarizer(
-  diff: string,
   reports: Map<string, string>,
   cwd: string,
   model: Model<Api>,
@@ -485,8 +484,7 @@ async function runSummarizer(
     }
   });
 
-  let prompt = `Here is the git diff:\n\n\`\`\`diff\n${diff}\n\`\`\`\n\n`;
-  prompt += `Here are the individual review reports:\n\n`;
+  let prompt = `Here are the individual review reports:\n\n`;
   for (const [name, report] of reports) {
     prompt += `## ${name}\n\n${report}\n\n---\n\n`;
   }
@@ -773,47 +771,56 @@ function helper() {
 
   spinner.succeed(`Agents complete (${total}/${total})`);
 
-  if (verbose) {
-    process.stderr.write(`\x1b[34m• Running summarizer...\x1b[0m\n\n`);
-  }
-
-  const summarizerSpinner = createSpinner(
-    "Generating summary...",
-    quiet || verbose,
-  );
-
   const outputWriter = createOutputWriter(colorMode);
 
   // Display what's being reviewed before the summary
   if (prInfo) {
-    summarizerSpinner.stop();
     const prUrl = formatPRUrl(prInfo);
     const shortCommit = prInfo.headRefOid.substring(0, 7);
     outputWriter.write(
       `\x1b[34mReviewing ${prUrl} at commit ${shortCommit}\x1b[0m\n\n`,
     );
   } else if (gitContext) {
-    summarizerSpinner.stop();
     outputWriter.write(
       `\x1b[34m${formatGitDiffContext(gitContext)}\x1b[0m\n\n`,
     );
   }
 
-  // Run summarizer (sessionId and modelLabel already defined above)
-  const { summary: summaryText, usage: summarizerUsage } = await runSummarizer(
-    diff,
-    reports,
-    cwd,
-    model,
-    authStorage,
-    modelRegistry,
-    outputWriter,
-    sessionId,
-    contextFiles,
-    summarizerSpinner,
-  );
-  mergeUsage(totalUsage, summarizerUsage);
-  debug("runReview: runSummarizer complete, calling outputWriter.end()");
+  let summaryText: string;
+
+  if (agentNames.length === 1) {
+    // Single agent: skip the summarizer, output the report directly
+    debug("runReview: single agent, skipping summarizer");
+    const report = results[0]!.report;
+    summaryText = report;
+    outputWriter.write(report);
+  } else {
+    // Multiple agents: run summarizer to synthesize reports
+    if (verbose) {
+      process.stderr.write(`\x1b[34m• Running summarizer...\x1b[0m\n\n`);
+    }
+
+    const summarizerSpinner = createSpinner(
+      "Generating summary...",
+      quiet || verbose,
+    );
+
+    const { summary, usage: summarizerUsage } = await runSummarizer(
+      reports,
+      cwd,
+      model,
+      authStorage,
+      modelRegistry,
+      outputWriter,
+      sessionId,
+      contextFiles,
+      summarizerSpinner,
+    );
+    summaryText = summary;
+    mergeUsage(totalUsage, summarizerUsage);
+  }
+
+  debug("runReview: output complete, calling outputWriter.end()");
   await outputWriter.end();
   debug("runReview: outputWriter.end() complete");
 

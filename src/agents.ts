@@ -25,6 +25,8 @@ SCOPE: Only report issues with code that is ADDED or MODIFIED in the diff (lines
 
 You have read-only access to the codebase. When the diff is ambiguous or you need more context, use your tools to read the surrounding code, check function signatures, look at types, and understand the broader context. Don't guess — look.
 
+Be judicious with tool use. The diff itself often contains enough context to identify issues. Only use tools when you genuinely need information not present in the diff — e.g. checking a type definition, verifying a function signature, or understanding how a modified function is called. Aim for at most 3-5 tool calls; if the diff is small and self-contained, you may not need any.
+
 For each issue found, provide:
 - The file and approximate location
 - What the bug is
@@ -53,6 +55,8 @@ You have read-only access to the codebase. Use your tools to:
 - Read existing test files to understand current coverage of the changed code
 - Read the implementation code to understand what should be tested
 - Find test utilities, fixtures, and patterns used in the project
+
+Be judicious with tool use. The diff itself often contains enough context to evaluate test coverage. Only use tools when you genuinely need to check existing test files or understand testing patterns. Aim for at most 3-5 tool calls; if the diff is small and self-contained, you may not need any.
 
 For each finding, provide:
 - What's missing or inadequate
@@ -83,6 +87,8 @@ You have read-only access to the codebase. Use your tools to:
 - Read files that import from modified modules
 - Check interface implementations and type dependencies
 - Look at configuration files that might reference changed code
+
+Be judicious with tool use. For impact analysis you will often need tools (grepping for callers, checking imports), but focus on the most important traces. Aim for at most 5-7 tool calls; prioritize checking the highest-risk impacts rather than exhaustively tracing every change.
 
 For each finding, provide:
 - What changed and what it affects
@@ -115,6 +121,8 @@ You have read-only access to the codebase. Use your tools to:
 - Look at existing error handling patterns
 - Read project configuration (linting rules, etc.) if relevant
 
+Be judicious with tool use. The diff itself often contains enough context to evaluate code quality. Only use tools when you need to check project conventions or see how similar patterns are handled elsewhere. Aim for at most 3-5 tool calls; if the diff is small and self-contained, you may not need any.
+
 For each finding, provide:
 - What the issue is
 - How the project typically handles this (with examples from the codebase)
@@ -128,7 +136,7 @@ Be specific and actionable. Output your findings in markdown.`,
 
 export const SUMMARIZER_PROMPT = `You are a senior engineer synthesizing multiple focused code reviews into a single coherent PR review.
 
-You will receive the git diff followed by individual review reports from specialized reviewers (bug hunting, test coverage, impact analysis, code quality).
+You will receive individual review reports from specialized reviewers (bug hunting, test coverage, impact analysis, code quality). Each report contains specific file locations, code snippets, and line references from the diff.
 
 Your job is to:
 1. Start with a brief summary of what the PR does (2-3 sentences)
