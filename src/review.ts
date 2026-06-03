@@ -29,6 +29,7 @@ import type { PullRequest } from "./github.ts";
 import { formatPRUrl } from "./github.ts";
 import type { FollowUp, ReviewData } from "./html.ts";
 import { generateHtml } from "./html.ts";
+import { generateMarkdown } from "./markdown.ts";
 import type { ColorMode, OutputWriter } from "./output.ts";
 import { createOutputWriter } from "./output.ts";
 import { createSpinner, type Spinner } from "./spinner.ts";
@@ -177,6 +178,10 @@ function getHtmlFile(sessionId: string): string {
   return path.join(getSessionDir(sessionId), "review.html");
 }
 
+function getMarkdownFile(sessionId: string): string {
+  return path.join(getSessionDir(sessionId), "review.md");
+}
+
 function updateLastLink(sessionId: string): void {
   try {
     fs.rmSync(LAST_LINK, { force: true });
@@ -207,6 +212,28 @@ export function openHtmlReport(sessionId: string): void {
     );
   }
   execFileSync("open", [htmlFile], { stdio: "ignore" });
+}
+
+/** Open or print the Markdown report for a session. */
+export function openMarkdownReport(sessionId: string): void {
+  const resolved = resolveSessionId(sessionId);
+  const mdFile = getMarkdownFile(resolved);
+  if (!fs.existsSync(mdFile)) {
+    // Try to regenerate from reports.json
+    const reportsFile = getReportsFile(resolved);
+    if (fs.existsSync(reportsFile)) {
+      const reviewData: ReviewData = JSON.parse(
+        fs.readFileSync(reportsFile, "utf-8"),
+      );
+      fs.writeFileSync(mdFile, generateMarkdown(reviewData));
+    } else {
+      throw new Error(
+        `No Markdown report found for session ${resolved}. Was this review run with an older version?`,
+      );
+    }
+  }
+  // Print to stdout so it can be piped
+  process.stdout.write(fs.readFileSync(mdFile, "utf-8"));
 }
 
 export interface ReviewOptions {
@@ -587,6 +614,10 @@ export async function continueReview(options: ContinueOptions): Promise<void> {
         reviewData.followups.push(followup);
         fs.writeFileSync(reportsFile, JSON.stringify(reviewData));
         fs.writeFileSync(getHtmlFile(sessionId), generateHtml(reviewData));
+        fs.writeFileSync(
+          getMarkdownFile(sessionId),
+          generateMarkdown(reviewData),
+        );
       } catch {
         // Non-fatal: if we can't update the HTML, the conversation still worked
         debug("Failed to update HTML report with follow-up");
@@ -806,11 +837,15 @@ function helper() {
   fs.mkdirSync(sessionDir, { recursive: true });
   fs.writeFileSync(getReportsFile(sessionId), JSON.stringify(reviewData));
   fs.writeFileSync(getHtmlFile(sessionId), generateHtml(reviewData));
+  fs.writeFileSync(getMarkdownFile(sessionId), generateMarkdown(reviewData));
   updateLastLink(sessionId);
 
-  // Print hint about HTML report
+  // Print hint about reports
   process.stderr.write(
     `\x1b[34mView full report: pr-review --html ${sessionId}\x1b[0m\n`,
+  );
+  process.stderr.write(
+    `\x1b[34mMarkdown export: pr-review --markdown ${sessionId}\x1b[0m\n`,
   );
 
   // Print token usage summary
