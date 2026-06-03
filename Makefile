@@ -17,7 +17,8 @@ lint:
 	bunx tsgo --noEmit
 
 test:
-	bun test
+	# don't rely on the system git config, it can break for agents in sandboxes
+	GIT_CONFIG_GLOBAL=/dev/null bun test
 
 lint-fix:
 	bunx biome check --write src/
