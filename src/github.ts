@@ -94,19 +94,18 @@ export function fetchPRMetadata(ref: GitHubPRReference): PullRequest {
     );
   } catch (err) {
     const execErr = err as ExecError;
+    const stderr = execErr.stderr?.trim() || (err as Error).message;
     // Check for common error cases
     if (execErr.status === 127) {
       throw new Error(
         "GitHub CLI (gh) is required to fetch PRs. Install: https://cli.github.com",
       );
     }
-    if (execErr.status === 4 || execErr.stderr?.includes("authentication")) {
+    if (execErr.status === 4) {
       throw new Error(
-        "GitHub authentication required for this repository.\nRun this command to authenticate:\n  gh auth login",
+        `GitHub authentication required for this repository.\nRun this command to authenticate:\n  gh auth login\n\ngh output: ${stderr}`,
       );
     }
-    // Show the actual error from gh
-    const stderr = execErr.stderr?.trim() || (err as Error).message;
     throw new Error(`Failed to fetch PR metadata: ${stderr}`);
   }
 
@@ -158,17 +157,17 @@ export function fetchPRDiff(
     });
   } catch (err) {
     const execErr = err as ExecError;
+    const stderr = execErr.stderr?.trim() || (err as Error).message;
     if (execErr.status === 127) {
       throw new Error(
         "GitHub CLI (gh) is required to fetch PRs. Install: https://cli.github.com",
       );
     }
-    if (execErr.status === 4 || execErr.stderr?.includes("authentication")) {
+    if (execErr.status === 4) {
       throw new Error(
-        "GitHub authentication required for this repository.\nRun this command to authenticate:\n  gh auth login",
+        `GitHub authentication required for this repository.\nRun this command to authenticate:\n  gh auth login\n\ngh output: ${stderr}`,
       );
     }
-    const stderr = execErr.stderr?.trim() || (err as Error).message;
     throw new Error(`Failed to fetch PR diff: ${stderr}`);
   }
 
