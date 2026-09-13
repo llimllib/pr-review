@@ -68,8 +68,6 @@ homebrew_casks:
           end
     homepage: "https://github.com/llimllib/pr-review"
     description: "AI-powered code review using multiple specialized agents"
-    url:
-      verified: "github.com/llimllib/pr-review"
 
 announce:
   skip: "true"
